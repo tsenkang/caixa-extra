@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Herói Supremo</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="tela"></canvas>
+  <canvas id="vento"></canvas>
+  <div id="dano"></div>
+
+  <!-- HUD -->
+  <div id="hud" class="escondido">
+    <div id="mira"><span></span></div>
+
+    <div id="painel-esq">
+      <div class="rotulo">VIDA</div>
+      <div class="barra"><div id="barra-vida"></div></div>
+      <div class="rotulo">LASER <span id="aviso-calor"></span></div>
+      <div class="barra"><div id="barra-calor"></div></div>
+    </div>
+
+    <div id="painel-dir">
+      <div id="estrelas"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>
+      <div class="contador">Prédios destruídos: <b id="cont-predios">0</b></div>
+      <div class="contador">Inimigos derrotados: <b id="cont-inimigos">0</b></div>
+    </div>
+
+    <div id="chefes"></div>
+    <div id="mensagens"></div>
+    <div id="fps"></div>
+    <div id="ajuda">WASD mover · Espaço sobe · Ctrl/C desce · Shift super velocidade · Mouse esq. laser · Mouse dir. pegar/arremessar · E soco · Esc pausa</div>
+  </div>
+
+  <!-- Menu inicial -->
+  <div id="menu" class="tela-cheia">
+    <div class="caixa">
+      <h1>HERÓI SUPREMO</h1>
+      <p class="sub">Voe, destrua, enfrente o exército e outros heróis.</p>
+      <table class="teclas">
+        <tr><td>Mouse</td><td>olhar</td></tr>
+        <tr><td>W A S D</td><td>mover / voar</td></tr>
+        <tr><td>Espaço / Ctrl (ou C)</td><td>subir / descer</td></tr>
+        <tr><td>Shift</td><td>super velocidade</td></tr>
+        <tr><td>Botão esquerdo</td><td>laser dos olhos</td></tr>
+        <tr><td>Botão direito</td><td>segurar = pegar, soltar = arremessar</td></tr>
+        <tr><td>E</td><td>soco de impacto</td></tr>
+      </table>
+      <label class="opcao"><input type="checkbox" id="op-telacheia" checked /> Tela cheia (permite usar Ctrl sem fechar a aba)</label>
+      <label class="opcao"><input type="checkbox" id="op-sombras" checked /> Sombras</label>
+      <button id="btn-jogar">JOGAR</button>
+      <p id="carregando">Carregando cidade...</p>
+    </div>
+  </div>
+
+  <!-- Pausa -->
+  <div id="pausa" class="tela-cheia escondido">
+    <div class="caixa">
+      <h2>PAUSADO</h2>
+      <button id="btn-continuar">CONTINUAR</button>
+      <button id="btn-reiniciar" class="secundario">REINICIAR</button>
+    </div>
+  </div>
+
+  <!-- Fim de jogo -->
+  <div id="fim" class="tela-cheia escondido">
+    <div class="caixa">
+      <h2>VOCÊ CAIU!</h2>
+      <p id="fim-texto"></p>
+      <button id="btn-reiniciar2">JOGAR DE NOVO</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
