@@ -119,6 +119,7 @@ export class SistemaPredios {
       cena.add(malha);
     }
     this.totalBlocos = contagem.reduce((a, b) => a + b, 0);
+    this.indexar();
   }
 
   // posição/tamanho/rotação da peça de verdade (bloco cheio, laje fina ou rampa inclinada)
@@ -175,10 +176,25 @@ export class SistemaPredios {
     return out.set(p.x0 + (i + 0.5) * p.tx, (j + 0.5) * p.ty, p.z0 + (k + 0.5) * p.tz);
   }
 
+  // grade de 32 m que diz quais prédios ocupam cada região (busca rápida)
+  indexar() {
+    this.grade = new Map();
+    for (const p of this.predios) {
+      for (let gx = Math.floor(p.x0 / 32); gx <= Math.floor(p.x1 / 32); gx++)
+        for (let gz = Math.floor(p.z0 / 32); gz <= Math.floor(p.z1 / 32); gz++) {
+          const ch = gx * 1000 + gz;
+          if (!this.grade.has(ch)) this.grade.set(ch, []);
+          this.grade.get(ch).push(p);
+        }
+    }
+  }
+
   // retorna o bloco inteiro naquele ponto (ou null). O objeto retornado é reaproveitado.
   celulaEm(x, y, z) {
     if (y < 0) return null;
-    for (const p of this.predios) {
+    const lista = this.grade?.get(Math.floor(x / 32) * 1000 + Math.floor(z / 32));
+    if (!lista) return null;
+    for (const p of lista) {
       if (x < p.x0 || x >= p.x1 || y >= p.y1 || z < p.z0 || z >= p.z1) continue;
       const i = ((x - p.x0) / p.tx) | 0;
       const j = (y / p.ty) | 0;

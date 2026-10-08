@@ -4,25 +4,28 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { texturaRua, texturaGrama, texturaCalcada } from './texturas.js';
 
 // linhas centrais das ruas
-export const RUAS_X = [-120, -60, 0, 60, 120]; // ruas "verticais" (correm ao longo de z)
-export const RUAS_Z = [-90, -30, 30, 90]; // ruas "horizontais" (correm ao longo de x)
+export const RUAS_X = [-180, -120, -60, 0, 60, 120, 180]; // ruas "verticais" (correm ao longo de z)
+export const RUAS_Z = [-150, -90, -30, 30, 90, 150]; // ruas "horizontais" (correm ao longo de x)
 export const ASFALTO = 9; // largura do asfalto (2 faixas)
 export const FAIXA = 2.25; // deslocamento do centro da faixa
 export const META_PLACA = 25.5; // metade do quarteirão com calçada
 export const META_LOTE = 23; // metade do lote (sem calçada)
 export const CALCADA = 24.25; // distância do centro do quarteirão até o meio da calçada
-export const FIM_X = 230, FIM_Z = 200; // até onde as ruas vão (fora da cidade)
+export const FIM_X = 300, FIM_Z = 270; // até onde as ruas vão (fora da cidade)
+export const LIMITE_CIDADE_X = 215, LIMITE_CIDADE_Z = 185; // borda da área construída
 
-// tipos dos 12 quarteirões [linha z][coluna x]
+// tipos dos 30 quarteirões [linha z][coluna x]: centro com prédios altos, bairros de casas em volta
 const MAPA = [
-  ['casas', 'altos', 'altos', 'casas'],
-  ['posto', 'praca', 'altos', 'casas'],
-  ['casas', 'altos', 'casas', 'altos'],
+  ['casas', 'casas', 'altos', 'casas', 'praca', 'casas'],
+  ['casas', 'altos', 'altos', 'altos', 'altos', 'casas'],
+  ['posto', 'altos', 'praca', 'altos', 'altos', 'casas'],
+  ['casas', 'altos', 'altos', 'altos', 'casas', 'posto'],
+  ['casas', 'casas', 'altos', 'casas', 'casas', 'casas'],
 ];
 
 export const QUARTEIROES = [];
-for (let j = 0; j < 3; j++)
-  for (let i = 0; i < 4; i++)
+for (let j = 0; j < MAPA.length; j++)
+  for (let i = 0; i < MAPA[0].length; i++)
     QUARTEIROES.push({ cx: (RUAS_X[i] + RUAS_X[i + 1]) / 2, cz: (RUAS_Z[j] + RUAS_Z[j + 1]) / 2, tipo: MAPA[j][i] });
 
 // pares [parede, detalhe]
@@ -141,7 +144,7 @@ export function criarCidade(jogo) {
   // árvores fora da cidade (campo)
   for (let n = 0; n < 420; n++) {
     const x = (Math.random() - 0.5) * 1200, z = (Math.random() - 0.5) * 1100;
-    if (Math.abs(x) < 165 && Math.abs(z) < 135) continue; // dentro da cidade
+    if (Math.abs(x) < LIMITE_CIDADE_X && Math.abs(z) < LIMITE_CIDADE_Z) continue; // dentro da cidade
     if (RUAS_X.some((r) => Math.abs(x - r) < 9) || RUAS_Z.some((r) => Math.abs(z - r) < 9)) continue; // em cima da rua
     arvores.push({ x, z, grande: Math.random() < 0.5 });
   }

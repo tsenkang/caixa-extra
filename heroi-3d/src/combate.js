@@ -52,7 +52,8 @@ export class Combate {
     if (this.tempoCombo <= 0 && this.combo) { this.combo = 0; jogo.hud.combo(0); }
     if (heroi.morto) return;
 
-    if (ctrl.apertou('KeyF') && this.espera <= 0 && !this.investida) this.socar();
+    // com alguém na mão o F vira "pancada" (ver Agarrar em poderes.js)
+    if (ctrl.apertou('KeyF') && this.espera <= 0 && !this.investida && !heroi.segurando) this.socar();
     if (ctrl.apertou('KeyQ') && this.esperaInvestida <= 0 && !this.investida) this.iniciarInvestida();
 
     if (this.avanco) this.atualizarAvanco(dt);

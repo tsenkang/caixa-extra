@@ -469,8 +469,8 @@ export class BombaCombustivel extends Entidade {
 export class Populacao {
   constructor(jogo) {
     this.jogo = jogo;
-    this.alvoPessoas = 55;
-    this.alvoCarros = 18;
+    this.alvoPessoas = 75;
+    this.alvoCarros = 28;
     this.tempo = 0;
     const calcadas = QUARTEIROES;
     for (let i = 0; i < this.alvoPessoas; i++) {

@@ -259,11 +259,102 @@ export class Agarrar {
       const frente = jogo.camera.frente;
       heroi.centro(_c);
       _v.copy(_c).addScaledVector(frente, 1.6 + e.raio).y += 0.2 - e.altura * 0.5;
-      e.pos.lerp(_v, Math.min(1, dt * 14));
+      // em alta velocidade fica colado na frente (é ele que bate primeiro nas paredes)
+      e.pos.lerp(_v, heroi.vel.length() > 10 ? 1 : Math.min(1, dt * 14));
       e.obj.rotation.y = heroi.yawCorpo;
       e.obj.rotation.z = Math.sin(jogo.tempo * 12) * 0.05; // se debatendo
-      if (ctrl.dirSoltou || !ctrl.mouseDir || heroi.morto) this.arremessar(e);
+      this.arrastar(e, dt);
+      this.esperaPancada = (this.esperaPancada ?? 0) - dt;
+      if (ctrl.apertou('KeyF') && this.esperaPancada <= 0 && !e.remover) this.pancada(e);
+      if (heroi.segurando && (ctrl.dirSoltou || !ctrl.mouseDir || heroi.morto)) this.arremessar(e);
     }
+  }
+
+  // voando rápido com alguém na mão: ele é arrastado pelas paredes (e pelo chão)
+  arrastar(e, dt) {
+    const jogo = this.jogo;
+    const heroi = jogo.heroi;
+    const vel = heroi.vel.length();
+    this.esperaSom = (this.esperaSom ?? 0) - dt;
+    if (vel < 10) return;
+    e.centro(_c).addScaledVector(heroi.vel, 0.02); // um pouco à frente: acerta a parede antes do herói
+    _vel.copy(heroi.vel).multiplyScalar(0.5);
+    const n = jogo.predios.danificarEsfera(_c, e.raio + 0.9, 9999, { velBase: _vel, forca: 9, origem: 'heroi', pedacos: 2, max: 20 });
+    const noChao = _c.y < e.altura * 0.5 + 0.4;
+    if (n > 0 || noChao) {
+      const dano = n > 0 ? n * 4 : vel * 0.15 * dt * 10;
+      e.levarDano(dano * (e.chefe ? 0.6 : 1), 'heroi');
+      if (e.chefe) e.tempoEstado = 0; // apanhando, não consegue se soltar
+      jogo.efeitos.faiscas(_c, n > 0 ? 6 : 2, 10, [1, 0.85, 0.5]);
+      jogo.efeitos.poeira(_c, n > 0 ? 3 : 1, 1.5, 4);
+      if (n > 0) {
+        jogo.camera.tremer(0.12 + n * 0.02);
+        heroi.vel.multiplyScalar(Math.max(0.88, 1 - n * 0.01));
+        if (this.esperaSom <= 0) { jogo.audio?.quebra(1); this.esperaSom = 0.07; }
+      }
+    }
+  }
+
+  // F segurando alguém: bate com ele no que estiver na frente (parede, chão ou outro inimigo)
+  pancada(e) {
+    const jogo = this.jogo;
+    const heroi = jogo.heroi;
+    this.esperaPancada = 0.3;
+    heroi.socoLado = -heroi.socoLado;
+    heroi.soco = 1;
+    const frente = jogo.camera.frente;
+    heroi.centro(_c);
+    let ponto = null;
+    let tipo = 'ar';
+    const parede = jogo.predios.raycast(_c, frente, 8 + e.raio);
+    if (parede) { ponto = _o.copy(parede.ponto); tipo = 'parede'; }
+    else if (frente.y < -0.3 && heroi.pos.y < 9) {
+      // contra o chão
+      const t = Math.min(10, (_c.y - 0.3) / -frente.y);
+      ponto = _o.copy(_c).addScaledVector(frente, t);
+      ponto.y = 0.3;
+      tipo = 'chao';
+    } else {
+      // contra outro inimigo na frente
+      for (const outro of jogo.entidades) {
+        if (outro === e || outro.remover || outro.estado === 'preso') continue;
+        outro.centro(_v);
+        if (_v.distanceTo(_c) < 7 + outro.raio && _v.clone().sub(_c).normalize().dot(frente) > 0.6) {
+          ponto = _o.copy(_v);
+          tipo = 'inimigo';
+          outro.levarDano(50, 'heroi');
+          outro.lancar(_vel.copy(frente).multiplyScalar(70 / Math.sqrt(outro.massa)).setY(8), true);
+          break;
+        }
+      }
+    }
+    if (!ponto) {
+      // golpe no ar: só o vento
+      jogo.efeitos.ondaDeChoque(_v.copy(_c).addScaledVector(frente, 3), 3, 0.2, 0xffffff, frente);
+      jogo.audio?.arremesso();
+      return;
+    }
+    // leva o corpo até o ponto do impacto (depois ele volta para as mãos)
+    e.pos.copy(ponto).addScaledVector(frente, -e.raio * 0.5).y -= e.altura * 0.5;
+    if (tipo === 'chao') e.pos.y = 0;
+    e.levarDano(e.chefe ? 35 : 70, 'heroi');
+    if (e.chefe) e.tempoEstado = 0;
+    _vel.copy(frente).multiplyScalar(tipo === 'chao' ? 10 : 28);
+    if (tipo === 'chao') _vel.y = 12;
+    jogo.predios.danificarEsfera(ponto, 3.2 + Math.min(3, e.massa * 0.4), 700, { velBase: _vel, forca: 14, origem: 'heroi', pedacos: 3 });
+    jogo.detritos.empurrar(ponto, 12, 16);
+    const normal = tipo === 'chao' ? _v.set(0, 1, 0) : frente;
+    jogo.efeitos.ondaDeChoque(ponto, tipo === 'chao' ? 12 : 8, 0.35, 0xffffff, normal);
+    jogo.efeitos.faiscas(ponto, 18, 16, [1, 0.9, 0.7]);
+    jogo.efeitos.poeira(ponto, 8, 3, 6);
+    jogo.congelar(0.08);
+    jogo.camera.tremer(0.5);
+    jogo.camera.socoFov?.(6);
+    jogo.marcarPerigo(ponto, 30);
+    jogo.audio?.soco(1.1);
+    // conta no combo
+    const cb = jogo.combate;
+    if (cb) { cb.combo++; cb.tempoCombo = 1.6; jogo.hud.combo(cb.combo); }
   }
 
   arremessar(e) {

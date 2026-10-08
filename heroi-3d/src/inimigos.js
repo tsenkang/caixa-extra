@@ -418,7 +418,7 @@ export class HeroiInimigo extends Entidade {
     const h = jogo.heroi.pos;
     const a = Math.random() * Math.PI * 2;
     this.pos.set(h.x + Math.cos(a) * 200, tipo === 'gigante' ? 0 : 50, h.z + Math.sin(a) * 200);
-    if (tipo === 'gigante') { this.pos.x = Math.max(-200, Math.min(200, this.pos.x)); this.pos.z = Math.max(-180, Math.min(180, this.pos.z)); }
+    if (tipo === 'gigante') { this.pos.x = Math.max(-260, Math.min(260, this.pos.x)); this.pos.z = Math.max(-240, Math.min(240, this.pos.z)); }
     if (tipo === 'raio') this.raio3d = new Raio(jogo.cena, 0xe0f2ff, 0x2a8cff, 0.06, 0.25);
     this.velAnim = 0;
   }
@@ -433,7 +433,7 @@ export class HeroiInimigo extends Entidade {
     if (this.estado === 'preso') {
       // se solta depois de um tempo
       this.tempoEstado += dt;
-      if (this.tempoEstado > 1.6) {
+      if (this.tempoEstado > 2.4) {
         const heroi = this.jogo.heroi;
         if (heroi.segurando === this) heroi.segurando = null;
         this.estado = 'normal';
