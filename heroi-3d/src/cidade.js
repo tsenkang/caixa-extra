@@ -1,6 +1,5 @@
 // Monta a cidade: chão, ruas, calçadas, praça, posto, prédios, casas, árvores, céu e luz.
 import * as THREE from 'three';
-import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { texturaRua, texturaGrama, texturaCalcada } from './texturas.js';
 
@@ -28,8 +27,9 @@ for (let j = 0; j < 3; j++)
 
 // pares [parede, detalhe]
 const PALETAS_PREDIO = [
-  [0xe9dcc4, 0xa0522d], [0xb9d3e0, 0x34506b], [0xf1e3b0, 0x7a6a3a], [0xd8c2b0, 0x6d4c41],
-  [0xc8d6c0, 0x4f6b4a], [0xe6e6ea, 0x4b5563], [0xf0c9a8, 0x9c4a2f], [0xa9c6cf, 0x1f4e5f],
+  [0xefe3cc, 0xc07a4f], [0xc9dde8, 0x6f8fab], [0xf4e7bd, 0xb39b5a], [0xe3cdb8, 0x9b7258],
+  [0xd5e2cc, 0x7f9a74], [0xeeeef1, 0x8a94a3], [0xf3d2b5, 0xc0704f], [0xbcd6dd, 0x5f8c99],
+  [0xd98c6a, 0xf0e0cc], [0xb5503c, 0xe8d8c4],
 ];
 const CORES_PREDIO = [0xd9d4c7, 0xb8c4cc, 0xc9b79c, 0x9fb1bc, 0xe0d0b0, 0xa8a8b0, 0xc7a99a, 0x8fa3ad];
 const CORES_CASA = [0xf4e1c1, 0xffffff, 0xc7e3f0, 0xf6c9a8, 0xd9f0c7, 0xf0d0e0, 0xf2e88a];
@@ -41,22 +41,15 @@ export function criarCidade(jogo) {
   const predios = jogo.predios;
 
   // ---------- céu, luz e névoa ----------
-  const ceu = new Sky();
-  ceu.scale.setScalar(2500);
-  const u = ceu.material.uniforms;
-  u.turbidity.value = 3.5;
-  u.rayleigh.value = 2.2;
-  u.mieCoefficient.value = 0.005;
-  u.mieDirectionalG.value = 0.88;
   // sol do fim de tarde: sombras compridas e luz dourada
-  const dirSol = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 28), THREE.MathUtils.degToRad(140));
-  u.sunPosition.value.copy(dirSol);
+  const dirSol = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 30), THREE.MathUtils.degToRad(140));
+  const ceu = criarCeu(dirSol);
   cena.add(ceu);
   jogo.ceu = ceu;
 
-  cena.fog = new THREE.Fog(0xc9d9ea, 200, 950);
+  cena.fog = new THREE.Fog(0xcfe0ef, 220, 1100);
 
-  cena.add(new THREE.HemisphereLight(0xd6e6ff, 0x8a7a5c, 1.7));
+  cena.add(new THREE.HemisphereLight(0xcfe2ff, 0x7d8a5a, 1.6));
   const sol = new THREE.DirectionalLight(0xffe2b8, 3.2);
   sol.position.copy(dirSol).multiplyScalar(300);
   sol.castShadow = true;
@@ -72,7 +65,7 @@ export function criarCidade(jogo) {
 
   // ---------- chão ----------
   const texGrama = texturaGrama();
-  texGrama.repeat.set(300, 300);
+  texGrama.repeat.set(160, 160);
   const chao = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ map: texGrama }));
   chao.rotation.x = -Math.PI / 2;
   chao.receiveShadow = true;
@@ -91,7 +84,7 @@ export function criarCidade(jogo) {
   for (const x of RUAS_X) {
     const r = new THREE.Mesh(new THREE.PlaneGeometry(ASFALTO, compZ), matRuaZ);
     r.rotation.x = -Math.PI / 2;
-    r.position.set(x, 0.02, 0);
+    r.position.set(x, 0.05, 0);
     r.receiveShadow = true;
     cena.add(r);
   }
@@ -99,7 +92,7 @@ export function criarCidade(jogo) {
     const r = new THREE.Mesh(new THREE.PlaneGeometry(ASFALTO, compX), matRuaX);
     r.rotation.x = -Math.PI / 2;
     r.rotation.z = Math.PI / 2;
-    r.position.set(0, 0.03, z);
+    r.position.set(0, 0.07, z);
     r.receiveShadow = true;
     cena.add(r);
   }
@@ -109,7 +102,7 @@ export function criarCidade(jogo) {
   for (const x of RUAS_X) for (const z of RUAS_Z) {
     const c = new THREE.Mesh(geoCruz, matCruz);
     c.rotation.x = -Math.PI / 2;
-    c.position.set(x, 0.04, z);
+    c.position.set(x, 0.09, z);
     c.receiveShadow = true;
     cena.add(c);
   }
@@ -119,7 +112,7 @@ export function criarCidade(jogo) {
   texCalc.repeat.set(17, 17);
   const matCalcada = new THREE.MeshLambertMaterial({ map: texCalc });
   const matLoteGrama = new THREE.MeshLambertMaterial({ map: texGrama.clone() });
-  matLoteGrama.map.repeat.set(8, 8);
+  matLoteGrama.map.repeat.set(4, 4);
   matLoteGrama.map.needsUpdate = true;
   const matLoteConcreto = new THREE.MeshLambertMaterial({ color: 0x9c9890 });
   const geoPlaca = new THREE.BoxGeometry(META_PLACA * 2, 0.2, META_PLACA * 2);
@@ -145,22 +138,15 @@ export function criarCidade(jogo) {
     else if (q.tipo === 'posto') montarPosto(jogo, q, arvores);
   }
 
-  // árvores (instanciadas)
-  const nArv = arvores.length;
-  const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.3, 2.4, 6), new THREE.MeshLambertMaterial({ color: 0x6b4a2b }), nArv);
-  const copa = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.8, 0), new THREE.MeshLambertMaterial({ color: 0x3f7f2f, flatShading: true }), nArv);
-  const m = new THREE.Matrix4();
-  arvores.forEach((a, i) => {
-    m.makeTranslation(a.x, 1.2, a.z);
-    tronco.setMatrixAt(i, m);
-    const s = 0.8 + Math.random() * 0.6;
-    m.makeScale(s, s * 1.2, s).setPosition(a.x, 3.2 + s, a.z);
-    copa.setMatrixAt(i, m);
-  });
-  tronco.castShadow = copa.castShadow = true;
-  copa.receiveShadow = true;
-  cena.add(tronco, copa);
-  jogo.arvores = { lista: arvores, tronco, copa };
+  // árvores fora da cidade (campo)
+  for (let n = 0; n < 420; n++) {
+    const x = (Math.random() - 0.5) * 1200, z = (Math.random() - 0.5) * 1100;
+    if (Math.abs(x) < 165 && Math.abs(z) < 135) continue; // dentro da cidade
+    if (RUAS_X.some((r) => Math.abs(x - r) < 9) || RUAS_Z.some((r) => Math.abs(z - r) < 9)) continue; // em cima da rua
+    arvores.push({ x, z, grande: Math.random() < 0.5 });
+  }
+  criarArvores(cena, arvores, jogo);
+  criarFaixasPedestre(cena);
 
   criarPostes(cena);
   criarHorizonte(cena);
@@ -194,27 +180,45 @@ function criarPostes(cena) {
 
 // montanhas e nuvens ao longe (sem névoa para não sumirem)
 function criarHorizonte(cena) {
-  const geos = [];
-  const cor = new THREE.Color();
-  const corMont = [new THREE.Color(0x8fa7b8), new THREE.Color(0x7f98a8), new THREE.Color(0xa3b5c2)];
-  for (let i = 0; i < 46; i++) {
-    const a = (i / 46) * Math.PI * 2 + Math.random() * 0.1;
-    const r = 1150 + Math.random() * 250;
-    const h = 90 + Math.random() * 200;
-    const g = new THREE.ConeGeometry(120 + Math.random() * 140, h, 6, 1).translate(Math.cos(a) * r, h / 2 - 5, Math.sin(a) * r).toNonIndexed();
-    cor.copy(corMont[i % 3]);
-    const n = g.attributes.position.count, arr = new Float32Array(n * 3);
-    for (let v = 0; v < n; v++) {
-      // topo mais claro (neve/névoa)
-      const y = g.attributes.position.getY(v);
-      const k = y > h * 0.8 ? 1.18 : 1;
-      arr[v * 3] = Math.min(1, cor.r * k); arr[v * 3 + 1] = Math.min(1, cor.g * k); arr[v * 3 + 2] = Math.min(1, cor.b * k);
+  // montanha "acidentada": cone com vértices deslocados e cor em degradê
+  const horizonte = new THREE.Color(0xcfe0ef);
+  const montanha = (x, z, raio, h, corBase, neve, rugas = 0.25) => {
+    const g = new THREE.ConeGeometry(raio, h, 9, 4).toNonIndexed();
+    const pos = g.attributes.position;
+    const arr = new Float32Array(pos.count * 3);
+    const c = new THREE.Color();
+    // desloca vértices (mesma posição = mesmo deslocamento, sem buracos)
+    const desl = new Map();
+    for (let v = 0; v < pos.count; v++) {
+      const px = pos.getX(v), py = pos.getY(v), pz = pos.getZ(v);
+      const ch = `${Math.round(px * 10) + 0},${Math.round(py * 10) + 0},${Math.round(pz * 10) + 0}`; // + 0 evita '-0'
+      if (!desl.has(ch)) desl.set(ch, py > h / 2 - 0.01 ? [0, 0, 0] : [(Math.random() - 0.5) * raio * rugas, (Math.random() - 0.5) * h * rugas * 0.4, (Math.random() - 0.5) * raio * rugas]);
+      const d = desl.get(ch);
+      pos.setXYZ(v, px + d[0] + x, py + d[1] + h / 2 - 4, pz + d[2] + z);
+      const t = (py + h / 2) / h; // 0 embaixo, 1 no topo
+      c.copy(corBase).lerp(horizonte, Math.max(0, 0.6 - t) * 0.8);
+      if (neve && t > 0.82) c.set(0xeef2f6);
+      arr[v * 3] = c.r; arr[v * 3 + 1] = c.g; arr[v * 3 + 2] = c.b;
     }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-    geos.push(g);
+    g.computeVertexNormals();
+    return g;
+  };
+  const longe = [], perto = [];
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2 + Math.random() * 0.1;
+    const r = 1250 + Math.random() * 300;
+    const h = 150 + Math.random() * 260;
+    longe.push(montanha(Math.cos(a) * r, Math.sin(a) * r, 160 + Math.random() * 160, h, new THREE.Color(0x7d97ad), h > 320, 0.1));
   }
-  const montanhas = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
-  cena.add(montanhas);
+  for (let i = 0; i < 34; i++) {
+    const a = (i / 34) * Math.PI * 2 + Math.random() * 0.15;
+    const r = 700 + Math.random() * 200;
+    perto.push(montanha(Math.cos(a) * r, Math.sin(a) * r, 90 + Math.random() * 90, 40 + Math.random() * 70, new THREE.Color(0x5f8f4a), false));
+  }
+  cena.add(new THREE.Mesh(mergeGeometries(longe), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false })));
+  const colinas = new THREE.Mesh(mergeGeometries(perto), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  cena.add(colinas);
 
   const nuvens = [];
   for (let i = 0; i < 18; i++) {
@@ -231,6 +235,84 @@ function criarHorizonte(cena) {
 }
 
 // quarteirão de prédios altos: 4 prédios (2 altos garantidos)
+// cúpula do céu com degradê e brilho do sol
+function criarCeu(dirSol) {
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      uTopo: { value: new THREE.Color(0x2f6fc4) },
+      uMeio: { value: new THREE.Color(0x7fb2e6) },
+      uHorizonte: { value: new THREE.Color(0xe3ecf2) },
+      uSol: { value: dirSol.clone() },
+    },
+    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform vec3 uTopo, uMeio, uHorizonte, uSol; varying vec3 vDir;
+      void main(){
+        float h = max(vDir.y, 0.0);
+        vec3 cor = mix(uHorizonte, uMeio, smoothstep(0.0, 0.18, h));
+        cor = mix(cor, uTopo, smoothstep(0.18, 0.75, h));
+        float s = max(dot(normalize(vDir), normalize(uSol)), 0.0);
+        cor += vec3(1.0, 0.85, 0.6) * pow(s, 8.0) * 0.35;   // brilho em volta do sol
+        cor += vec3(1.0, 0.95, 0.85) * pow(s, 900.0) * 6.0; // disco do sol
+        if (vDir.y < 0.0) cor = uHorizonte;
+        gl_FragColor = vec4(cor, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
+  const m = new THREE.Mesh(new THREE.SphereGeometry(2400, 32, 16), mat);
+  m.frustumCulled = false;
+  m.renderOrder = -1;
+  return m;
+}
+
+function criarArvores(cena, arvores, jogo) {
+  const n = arvores.length;
+  const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.32, 2.6, 6), new THREE.MeshLambertMaterial({ color: 0x6b4a2b }), n);
+  const geoCopa = new THREE.IcosahedronGeometry(1.8, 1);
+  const copa1 = new THREE.InstancedMesh(geoCopa, new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), n);
+  const copa2 = new THREE.InstancedMesh(geoCopa, new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), n);
+  const verdes = [0x3f7f2f, 0x4f8f35, 0x2f6b2a, 0x5f9a3a, 0x6b8f2a];
+  const m = new THREE.Matrix4(), c = new THREE.Color();
+  arvores.forEach((a, i) => {
+    const s = (0.8 + Math.random() * 0.6) * (a.grande ? 1.5 : 1);
+    m.makeScale(s, s, s).setPosition(a.x, 1.3 * s, a.z);
+    tronco.setMatrixAt(i, m);
+    m.makeScale(s * 1.1, s * 1.05, s * 1.1).setPosition(a.x, 3.2 * s, a.z);
+    copa1.setMatrixAt(i, m);
+    m.makeScale(s * 0.75, s * 0.8, s * 0.75).setPosition(a.x + 0.3 * s, 4.6 * s, a.z - 0.2 * s);
+    copa2.setMatrixAt(i, m);
+    c.set(verdes[(Math.random() * verdes.length) | 0]);
+    copa1.setColorAt(i, c);
+    copa2.setColorAt(i, c.multiplyScalar(1.18));
+  });
+  tronco.castShadow = copa1.castShadow = copa2.castShadow = true;
+  copa1.receiveShadow = copa2.receiveShadow = true;
+  cena.add(tronco, copa1, copa2);
+  jogo.arvores = { lista: arvores, tronco, copa: copa1 };
+}
+
+// faixas de pedestre perto dos cruzamentos
+function criarFaixasPedestre(cena) {
+  const listras = [];
+  const d = ASFALTO / 2 + 2.2;
+  for (const x of RUAS_X) for (const z of RUAS_Z) {
+    for (let l = -3; l <= 3; l++) {
+      const o = l * 1.2;
+      listras.push([x + o, z - d, 0], [x + o, z + d, 0], [x - d, z + o, 1], [x + d, z + o, 1]);
+    }
+  }
+  const malha = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.02, 3), new THREE.MeshLambertMaterial({ color: 0xf2f0e6 }), listras.length);
+  const m = new THREE.Matrix4();
+  listras.forEach(([x, z, r], i) => {
+    m.makeRotationY(r ? Math.PI / 2 : 0).setPosition(x, 0.11, z);
+    malha.setMatrixAt(i, m);
+  });
+  malha.receiveShadow = true;
+  cena.add(malha);
+}
+
 function montarAltos(predios, q) {
   const posicoes = [[-17, -17], [5, -17], [-17, 5], [5, 5]];
   const altos = [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, 2 + (Math.random() < 0.4 ? 1 : 0));
@@ -238,19 +320,36 @@ function montarAltos(predios, q) {
     const alto = altos.includes(n);
     const nx = 4, nz = 4;
     const ny = alto ? 10 + ((Math.random() * 16) | 0) : 3 + ((Math.random() * 5) | 0);
+    // estilos: vidro espelhado, clássico (tijolo/pedra) ou residencial (janelas com cortina)
+    const estilo = alto ? aleatorio(['vidro', 'vidro', 'classico', 'residencial']) : aleatorio(['classico', 'residencial', 'residencial']);
+    const recuo = alto && Math.random() < 0.65 ? Math.max(4, Math.floor(ny * (0.55 + Math.random() * 0.2))) : 999; // andar onde o prédio afina
+    const casaMaquinas = Math.random() < 0.75;
     const [corParede, corDetalhe] = aleatorio(PALETAS_PREDIO);
     const parede = new THREE.Color(corParede), detalhe = new THREE.Color(corDetalhe);
-    const terreo = new THREE.Color(0x4a5560);
+    const vidro = new THREE.Color(aleatorio([0xffffff, 0xd8f0e8, 0xe8e0ff, 0xd0e4ff]));
+    const borda = (i, k) => i === nx - 1 || k === nz - 1;
     predios.criarPredio({
-      x: q.cx + ox, z: q.cz + oz, nx, ny, nz, tx: 3, ty: 3.2, tz: 3,
+      x: q.cx + ox, z: q.cz + oz, nx, ny: ny + (casaMaquinas ? 1 : 0), nz, tx: 3, ty: 3.2, tz: 3,
       nome: alto ? 'arranha-céu' : 'prédio',
-      // térreo escuro (lojas), quinas e topo na cor de detalhe, laje cinza no teto
-      forma: (i, j, k) => (j === ny - 1 ? 2 : 1),
-      corCelula: (i, j, k, t) => {
-        if (t === 2) return (i + k) % 2 ? 0x7d7f84 : 0x8e9096;
-        if (j === 0) return terreo;
+      forma: (i, j, k) => {
+        if (j >= ny) return i >= 1 && i <= 2 && k >= 1 && k <= 2 ? 2 : 0; // casa de máquinas no teto
+        if (j >= recuo && borda(i, k)) return 0; // recuo dos andares de cima
+        if (j === ny - 1 || (j === recuo - 1 && borda(i, k))) return 2; // laje do teto
         const quina = (i === 0 || i === nx - 1) && (k === 0 || k === nz - 1);
-        if (quina || j === ny - 2 || (alto && j % 6 === 0)) return detalhe;
+        if (estilo === 'vidro') return j === 0 ? 1 : quina ? 2 : 4;
+        if (estilo === 'residencial') return j > 0 && Math.random() < 0.35 ? 3 : 1;
+        return j > 0 && Math.random() < 0.12 ? 3 : 1;
+      },
+      corCelula: (i, j, k, t) => {
+        if (j >= ny) return 0xb7b9bd;
+        if (t === 2) {
+          if (estilo === 'vidro' && j < ny - 1) return 0xb4bec9; // colunas metálicas
+          return (i + k) % 2 ? 0x8a8c91 : 0x9a9ca1;
+        }
+        if (t === 4) return vidro;
+        if (j === 0) return 0x56616c; // térreo com lojas
+        const quina = (i === 0 || i === nx - 1) && (k === 0 || k === nz - 1);
+        if (quina || j === ny - 2 || j === recuo - 1) return detalhe;
         return parede;
       },
     });
@@ -271,7 +370,7 @@ function montarCasas(predios, q, arvores) {
 
 function criarCasa(predios, cx, cz) {
   const cor = aleatorio(CORES_CASA);
-  const telhado = aleatorio([0xa63c2a, 0x7a3b2e, 0x5a4a42, 0x8c2f1f]);
+  const telhado = aleatorio([0xd0603f, 0xc2704f, 0xb34a35, 0x8f6a5a, 0x5f7a8f]);
   const andares = Math.random() < 0.5 ? 2 : 1;
   predios.criarPredio({
     x: cx - 4.5, z: cz - 4.5, nx: 3, ny: andares + 2, nz: 3, tx: 3, ty: 2.8, tz: 3,

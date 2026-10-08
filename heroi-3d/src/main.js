@@ -15,6 +15,24 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ajuste de cor final: um pouco mais de saturação e contraste + vinheta nas bordas
+const CorFinal = {
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.15 }, uVinheta: { value: 0.35 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uSat, uVinheta; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+      c.rgb = mix(vec3(l), c.rgb, uSat);
+      vec2 d = vUv - 0.5;
+      c.rgb *= 1.0 - dot(d, d) * uVinheta * 2.0;
+      gl_FragColor = c;
+    }`,
+};
 import * as Inimigos from './inimigos.js';
 const { Projeteis, Alerta } = Inimigos;
 
@@ -28,7 +46,7 @@ class Jogo {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.95;
 
@@ -41,6 +59,11 @@ class Jogo {
     this.perigos = []; // pontos de perigo recentes (as pessoas fogem)
     this.pausado = true;
     this.tempo = 0;
+
+    // reflexos suaves nos materiais "metálicos" (herói, heróis inimigos)
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.cena.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.cena.environmentIntensity = 0.45;
 
     this.predios = new SistemaPredios(this);
     criarCidade(this);
@@ -66,6 +89,7 @@ class Jogo {
     this.composer.addPass(new RenderPass(this.cena, this.cam3));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.45, 4.0);
     this.composer.addPass(this.bloom);
+    this.composer.addPass(new ShaderPass(CorFinal));
     this.composer.addPass(new OutputPass());
     this.usarBloom = true;
 

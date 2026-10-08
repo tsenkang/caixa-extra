@@ -3,7 +3,7 @@
 // Todos os blocos da cidade são desenhados com 2 InstancedMesh (paredes com janela e blocos lisos).
 // Quando um bloco quebra, a instância some e nasce um pedaço com física (detritos.js).
 import * as THREE from 'three';
-import { texturaJanela, texturaConcreto } from './texturas.js';
+import { texturaJanela, texturaConcreto, texturaJanelaAcesa, texturaVidro } from './texturas.js';
 
 const HP_BLOCO = 30;
 const MAX_QUEDA_POR_QUADRO = 160; // quantos blocos soltos viram pedaços por quadro
@@ -26,9 +26,14 @@ export class SistemaPredios {
     this.emissores = [];
     this.destruidos = 0;
     this.blocosQuebrados = 0;
-    this.matParede = new THREE.MeshLambertMaterial({ map: texturaJanela() });
-    this.matLiso = new THREE.MeshLambertMaterial({ map: texturaConcreto() });
-    this.atualizarMalha = [false, false, false];
+    // tipos de bloco: 1 parede com janela, 2 liso, 3 janela com cortina/luz, 4 vidro espelhado
+    this.materiais = [null,
+      new THREE.MeshLambertMaterial({ map: texturaJanela() }),
+      new THREE.MeshLambertMaterial({ map: texturaConcreto() }),
+      new THREE.MeshLambertMaterial({ map: texturaJanelaAcesa() }),
+      new THREE.MeshPhongMaterial({ map: texturaVidro(), shininess: 90, specular: 0x8899aa }),
+    ];
+    this.atualizarMalha = this.materiais.map(() => false);
     this._fila = new Int32Array(4096);
     this._res = { p: null, idx: -1 };
     this._hit = { dist: 0, ponto: new THREE.Vector3(), normal: new THREE.Vector3(), p: null, idx: -1 };
@@ -81,13 +86,11 @@ export class SistemaPredios {
 
   // cria as InstancedMesh depois que todos os prédios foram definidos
   finalizar(cena) {
-    const contagem = [0, 0, 0];
+    const contagem = this.materiais.map(() => 0);
     for (const p of this.predios) for (let i = 0; i < p.n; i++) if (p.tipo[i]) contagem[p.malha[i]]++;
     const geo = new THREE.BoxGeometry(1, 1, 1);
-    this.malhas = [null,
-      new THREE.InstancedMesh(geo, this.matParede, Math.max(1, contagem[1])),
-      new THREE.InstancedMesh(geo, this.matLiso, Math.max(1, contagem[2]))];
-    const usados = [0, 0, 0];
+    this.malhas = this.materiais.map((mat, m) => (mat ? new THREE.InstancedMesh(geo, mat, Math.max(1, contagem[m])) : null));
+    const usados = this.materiais.map(() => 0);
     for (const p of this.predios) {
       for (let idx = 0; idx < p.n; idx++) {
         if (!p.tipo[idx]) continue;
@@ -102,14 +105,15 @@ export class SistemaPredios {
         this.malhas[m].setColorAt(inst, _c);
       }
     }
-    for (let m = 1; m <= 2; m++) {
+    for (let m = 1; m < this.malhas.length; m++) {
       const malha = this.malhas[m];
+      malha.count = usados[m];
       malha.castShadow = true;
       malha.receiveShadow = true;
       malha.computeBoundingSphere();
       cena.add(malha);
     }
-    this.totalBlocos = contagem[1] + contagem[2];
+    this.totalBlocos = contagem.reduce((a, b) => a + b, 0);
   }
 
   centroCelula(p, idx, out) {
@@ -395,7 +399,7 @@ export class SistemaPredios {
       if (em.tempo <= 0) this.emissores.splice(e, 1);
     }
 
-    for (let m = 1; m <= 2; m++) {
+    for (let m = 1; m < this.malhas.length; m++) {
       if (this.atualizarMalha[m]) {
         this.malhas[m].instanceMatrix.needsUpdate = true;
         this.atualizarMalha[m] = false;
