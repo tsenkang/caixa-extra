@@ -6,6 +6,9 @@ import * as THREE from 'three';
 import { texturaJanela, texturaConcreto, texturaJanelaAcesa, texturaVidro } from './texturas.js';
 
 const HP_BLOCO = 30;
+const ESP = 0.4; // espessura das lajes e rampas (interior dos prédios)
+// valores da função "forma": 1 parede, 2 liso, 3 janela acesa, 4 vidro, 5 laje (piso fino), 6 rampa (sobe em +z)
+const _e = new THREE.Euler();
 const MAX_QUEDA_POR_QUADRO = 160; // quantos blocos soltos viram pedaços por quadro
 
 const _m = new THREE.Matrix4();
@@ -48,7 +51,8 @@ export class SistemaPredios {
       x0: x, z0: z, nx, ny, nz, tx, ty, tz, n,
       x1: x + nx * tx, y1: ny * ty, z1: z + nz * tz,
       tipo: new Uint8Array(n), // 1 = bloco inteiro, 0 = vazio/quebrado
-      malha: new Uint8Array(n), // 1 = parede com janela, 2 = liso
+      malha: new Uint8Array(n), // 1 = parede com janela, 2 = liso, 3 = janela acesa, 4 = vidro
+      formato: new Uint8Array(n), // 0 = bloco cheio, 1 = laje, 2 = rampa
       inst: new Int32Array(n).fill(-1),
       hp: new Float32Array(n),
       cores: new Float32Array(n * 3),
@@ -67,7 +71,8 @@ export class SistemaPredios {
           const t = op.forma ? op.forma(i, j, k) : (j === ny - 1 ? 2 : 1);
           if (!t) continue;
           p.tipo[idx] = 1;
-          p.malha[idx] = t;
+          p.malha[idx] = t >= 5 ? 2 : t;
+          p.formato[idx] = t === 5 ? 1 : t === 6 ? 2 : 0;
           p.hp[idx] = HP_BLOCO * (op.resistencia ?? 1);
           if (op.corCelula) _c.set(op.corCelula(i, j, k, t));
           else _c.copy(t === 2 ? corTopo : cor);
@@ -97,9 +102,7 @@ export class SistemaPredios {
         const m = p.malha[idx];
         const inst = usados[m]++;
         p.inst[idx] = inst;
-        this.centroCelula(p, idx, _p);
-        _s.set(p.tx, p.ty, p.tz);
-        _m.compose(_p, _q.identity(), _s);
+        this.matrizCelula(p, idx, _m);
         this.malhas[m].setMatrixAt(inst, _m);
         _c.setRGB(p.cores[idx * 3], p.cores[idx * 3 + 1], p.cores[idx * 3 + 2]);
         this.malhas[m].setColorAt(inst, _c);
@@ -114,6 +117,53 @@ export class SistemaPredios {
       cena.add(malha);
     }
     this.totalBlocos = contagem.reduce((a, b) => a + b, 0);
+  }
+
+  // posição/tamanho/rotação da peça de verdade (bloco cheio, laje fina ou rampa inclinada)
+  matrizCelula(p, idx, out) {
+    this.centroCelula(p, idx, _p);
+    const f = p.formato[idx];
+    if (f === 1) {
+      _p.y += -p.ty / 2 + ESP / 2;
+      _s.set(p.tx, ESP, p.tz);
+      _q.identity();
+    } else if (f === 2) {
+      _s.set(p.tx * 0.92, ESP, Math.hypot(p.ty, p.tz));
+      _q.setFromEuler(_e.set(-Math.atan2(p.ty, p.tz), 0, 0));
+    } else {
+      _s.set(p.tx, p.ty, p.tz);
+      _q.identity();
+    }
+    return out.compose(_p, _q, _s);
+  }
+
+  // tamanho aproximado da peça (para os pedaços que caem)
+  tamanhoPeca(p, idx, out) {
+    const f = p.formato[idx];
+    if (f === 1) return out.set(p.tx, ESP, p.tz);
+    if (f === 2) return out.set(p.tx * 0.9, ESP, Math.hypot(p.ty, p.tz) * 0.9);
+    return out.set(p.tx, p.ty, p.tz);
+  }
+
+  // o ponto (x,y,z) está dentro da parte sólida da célula? (lajes e rampas são finas)
+  dentroDaPeca(p, idx, x, y, z) {
+    const f = p.formato[idx];
+    if (f === 0) return true;
+    const j = (idx / (p.nx * p.nz)) | 0;
+    const ly = y - j * p.ty;
+    if (f === 1) return ly < ESP;
+    const k = ((idx / p.nx) | 0) % p.nz;
+    const h = ((z - p.z0 - k * p.tz) / p.tz) * p.ty; // altura da rampa nesse ponto
+    return ly < h + ESP * 0.6 && ly > h - ESP * 1.5;
+  }
+
+  topoDaPeca(p, idx, z) {
+    const j = (idx / (p.nx * p.nz)) | 0;
+    const f = p.formato[idx];
+    if (f === 0) return (j + 1) * p.ty;
+    if (f === 1) return j * p.ty + ESP;
+    const k = ((idx / p.nx) | 0) % p.nz;
+    return j * p.ty + ((z - p.z0 - k * p.tz) / p.tz) * p.ty + ESP * 0.6;
   }
 
   centroCelula(p, idx, out) {
@@ -132,7 +182,11 @@ export class SistemaPredios {
       const j = (y / p.ty) | 0;
       const k = ((z - p.z0) / p.tz) | 0;
       const idx = i + p.nx * (k + p.nz * j);
-      if (p.tipo[idx]) { this._res.p = p; this._res.idx = idx; return this._res; }
+      if (p.tipo[idx] && this.dentroDaPeca(p, idx, x, y, z)) {
+        this._res.p = p; this._res.idx = idx;
+        this._res.topo = this.topoDaPeca(p, idx, z);
+        return this._res;
+      }
       return null;
     }
     return null;
@@ -178,7 +232,20 @@ export class SistemaPredios {
       let nAx = eixo, nSinal = eixo >= 0 ? -Math.sign(ds[eixo]) : 0;
       for (let passo = 0; passo < 300; passo++) {
         const idx = i + p.nx * (k + p.nz * j);
-        if (p.tipo[idx]) {
+        let tAcerto = t;
+        let solidoAqui = p.tipo[idx] === 1;
+        if (solidoAqui && p.formato[idx] !== 0) {
+          // peça fina: procura o ponto de entrada dentro da célula
+          const tFim = Math.min(tmx, tmy, tmz, tmax);
+          solidoAqui = false;
+          for (let a = 0; a <= 8; a++) {
+            const ta = t + ((tFim - t) * a) / 8;
+            if (this.dentroDaPeca(p, idx, o.x + d.x * ta, o.y + d.y * ta, o.z + d.z * ta)) { tAcerto = ta; solidoAqui = true; break; }
+          }
+          if (solidoAqui) { nAx = 1; nSinal = d.y > 0 ? -1 : 1; }
+        }
+        if (solidoAqui) {
+          t = tAcerto;
           if (t < melhor) {
             melhor = t; achou = true;
             hit.p = p; hit.idx = idx; hit.dist = t;
@@ -218,7 +285,8 @@ export class SistemaPredios {
             // distância do centro da esfera até a caixa do bloco
             const bx0 = p.x0 + i * p.tx, by0 = j * p.ty, bz0 = p.z0 + k * p.tz;
             const dx = Math.max(bx0 - c.x, 0, c.x - (bx0 + p.tx));
-            const dy = Math.max(by0 - c.y, 0, c.y - (by0 + p.ty));
+            const altura = p.formato[idx] === 1 ? ESP : p.ty;
+            const dy = Math.max(by0 - c.y, 0, c.y - (by0 + altura));
             const dz = Math.max(bz0 - c.z, 0, c.z - (bz0 + p.tz));
             const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (dist > raio) continue;
@@ -267,9 +335,20 @@ export class SistemaPredios {
   criarPedacos(p, idx, vel, pedacos) {
     const det = this.jogo.detritos;
     this.centroCelula(p, idx, _p);
+    if (p.formato[idx] === 1) _p.y += -p.ty / 2 + ESP / 2;
     _c.setRGB(p.cores[idx * 3], p.cores[idx * 3 + 1], p.cores[idx * 3 + 2]);
     if (det) {
-      if (pedacos <= 1) {
+      if (p.formato[idx] !== 0) {
+        // laje/rampa: quebra em duas placas finas
+        this.tamanhoPeca(p, idx, _tam);
+        _tam.x *= 0.5;
+        const bx = vel.x, by = vel.y, bz = vel.z; // vel pode ser o mesmo vetor _vel
+        for (const lado of [-1, 1]) {
+          _s.set(_p.x + lado * p.tx * 0.25, _p.y, _p.z);
+          _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(4);
+          det.criar(_s, _tam, _c, _vel.set(bx + lado * 2, by, bz), _ang);
+        }
+      } else if (pedacos <= 1) {
         _tam.set(p.tx * 0.95, p.ty * 0.95, p.tz * 0.95);
         _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(3);
         det.criar(_p, _tam, _c, vel, _ang);
@@ -367,7 +446,11 @@ export class SistemaPredios {
         const ox = _p.x - (p.x0 + p.x1) / 2, oz = _p.z - (p.z0 + p.z1) / 2;
         _vel.set(ox * 0.25 + (Math.random() - 0.5) * 3, -1 - Math.random() * 3, oz * 0.25 + (Math.random() - 0.5) * 3);
         _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(3);
-        if (a % 2 === 0) {
+        if (p.formato[idx] !== 0) {
+          if (p.formato[idx] === 1) _p.y += -p.ty / 2 + ESP / 2;
+          this.tamanhoPeca(p, idx, _tam).multiplyScalar(0.95);
+          det?.criar(_p, _tam, _c, _vel, _ang);
+        } else if (a % 2 === 0) {
           _tam.set(p.tx * 0.95, p.ty * 0.95, p.tz * 0.95);
           det?.criar(_p, _tam, _c, _vel, _ang);
         } else {

@@ -313,6 +313,16 @@ function criarFaixasPedestre(cena) {
   cena.add(malha);
 }
 
+// interior simples (estilo JJS): -1 = não é interior; 0 = vazio; 5 = laje; 6 = rampa
+// a rampa troca de lado a cada andar e sobe em +z; em cima dela fica um buraco
+function interior(i, j, k, ex, ez) {
+  if (!(i > 0 && i < ex - 1 && k > 0 && k < ez - 1)) return -1;
+  const ladoRampa = (andar) => (andar % 2 === 0 ? 1 : ex - 2);
+  if (i === ladoRampa(j) && k === 1) return 6;
+  if (j > 0 && i === ladoRampa(j - 1) && k === 1) return 0; // buraco por onde a rampa chega
+  return j === 0 ? 0 : 5; // térreo usa o chão
+}
+
 function montarAltos(predios, q) {
   const posicoes = [[-17, -17], [5, -17], [-17, 5], [5, 5]];
   const altos = [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, 2 + (Math.random() < 0.4 ? 1 : 0));
@@ -335,12 +345,17 @@ function montarAltos(predios, q) {
         if (j >= ny) return i >= 1 && i <= 2 && k >= 1 && k <= 2 ? 2 : 0; // casa de máquinas no teto
         if (j >= recuo && borda(i, k)) return 0; // recuo dos andares de cima
         if (j === ny - 1 || (j === recuo - 1 && borda(i, k))) return 2; // laje do teto
+        // interior oco: lajes (pisos) e uma rampa por andar, com o buraco da rampa de baixo
+        const t = interior(i, j, k, j >= recuo ? nx - 1 : nx, j >= recuo ? nz - 1 : nz);
+        if (t >= 0) return t;
         const quina = (i === 0 || i === nx - 1) && (k === 0 || k === nz - 1);
         if (estilo === 'vidro') return j === 0 ? 1 : quina ? 2 : 4;
         if (estilo === 'residencial') return j > 0 && Math.random() < 0.35 ? 3 : 1;
         return j > 0 && Math.random() < 0.12 ? 3 : 1;
       },
       corCelula: (i, j, k, t) => {
+        if (t === 5) return (i + k + j) % 2 ? 0xc8a982 : 0xbb9a72; // piso de madeira
+        if (t === 6) return 0xa3a7ad; // rampa de concreto
         if (j >= ny) return 0xb7b9bd;
         if (t === 2) {
           if (estilo === 'vidro' && j < ny - 1) return 0xb4bec9; // colunas metálicas
@@ -376,7 +391,11 @@ function criarCasa(predios, cx, cz) {
     x: cx - 4.5, z: cz - 4.5, nx: 3, ny: andares + 2, nz: 3, tx: 3, ty: 2.8, tz: 3,
     cor, corTopo: telhado, nome: 'casa',
     // telhado em degraus: camada inteira + cumeeira só na fileira do meio
-    forma: (i, j, k) => (j < andares ? 1 : j === andares ? 2 : (k === 1 ? 2 : 0)),
+    forma: (i, j, k) => {
+      if (j < andares && i === 1 && k === 1) return j === 0 && andares === 2 ? 6 : 0; // miolo oco (com rampa)
+      return j < andares ? 1 : j === andares ? 2 : (k === 1 ? 2 : 0);
+    },
+    corCelula: (i, j, k, t) => (t === 6 ? 0xb89a76 : t === 2 ? telhado : cor),
   });
 }
 
@@ -418,13 +437,14 @@ function montarPosto(jogo, q, arvores) {
   const ox = q.cx - 19, oz = q.cz - 19;
   predios.criarPredio({
     x: ox, z: oz, nx: 6, ny: 2, nz: 4, tx: 3, ty: 3.5, tz: 3, nome: 'posto', conta: false,
-    forma: (i, j, k) => (j === 1 ? 2 : ((i === 0 || i === 5) && (k === 0 || k === 3) ? 2 : 0)),
+    forma: (i, j, k) => (j === 1 ? 5 : ((i === 0 || i === 5) && (k === 0 || k === 3) ? 2 : 0)),
     corCelula: (i, j, k) => (j === 1 && (k === 0 || k === 3 || i === 0 || i === 5) ? 0xd92d20 : 0xf2f2f2),
   });
   // loja de conveniência
   predios.criarPredio({
     x: q.cx + 4, z: q.cz - 19, nx: 5, ny: 2, nz: 3, tx: 3, ty: 3.2, tz: 3,
     cor: 0xf5f5f5, corTopo: 0xd92d20, nome: 'loja',
+    forma: (i, j, k) => (j === 1 ? 2 : i > 0 && i < 4 && k === 1 ? 0 : 1),
   });
   // bombas de combustível (explodem! criadas como entidades depois)
   for (const bx of [-12, -5]) for (const bz of [-15, -10])

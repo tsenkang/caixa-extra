@@ -205,7 +205,7 @@ export class SistemaDetritos {
         let piso = 0;
         if (vy < 0) {
           const cel = predios.celulaEm(x, y - meia, z);
-          if (cel) piso = (((y - meia) / cel.p.ty) | 0) * cel.p.ty + cel.p.ty;
+          if (cel) piso = cel.topo;
         }
         if (y - meia < piso) {
           y = piso + meia;
