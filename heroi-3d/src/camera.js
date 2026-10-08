@@ -31,7 +31,7 @@ export class CameraHeroi {
     this.direita.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
   }
 
-  tremer(qtd) { this.trauma = Math.min(1, this.trauma + qtd); }
+  tremer(qtd) { if (Number.isFinite(qtd)) this.trauma = Math.min(0.85, this.trauma + Math.min(0.5, qtd)); }
 
   atualizar(dt, heroi, predios) {
     this.tempo += dt;
@@ -65,11 +65,11 @@ export class CameraHeroi {
     // tremida
     const s = this.trauma * this.trauma;
     if (s > 0.001) {
-      cam.position.x += (Math.random() - 0.5) * s * 1.6;
-      cam.position.y += (Math.random() - 0.5) * s * 1.6;
-      cam.position.z += (Math.random() - 0.5) * s * 1.6;
+      cam.position.x += (Math.random() - 0.5) * s * 1.1;
+      cam.position.y += (Math.random() - 0.5) * s * 1.1;
+      cam.position.z += (Math.random() - 0.5) * s * 1.1;
     }
-    this.trauma = Math.max(0, this.trauma - dt * 1.4);
+    this.trauma = Math.max(0, this.trauma - dt * 2.2);
 
     _alvo.copy(cam.position).add(this.frente);
     cam.lookAt(_alvo);

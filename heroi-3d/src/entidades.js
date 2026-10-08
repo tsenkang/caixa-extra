@@ -84,6 +84,8 @@ export class Entidade {
 
   // empurrão (explosão, soco, herói passando)
   lancar(vel, porHeroi = true) {
+    if (!Number.isFinite(vel.x + vel.y + vel.z)) return; // proteção contra valor inválido
+    this.noTeto = false;
     if (this.estado === 'morto' && !this.podeVoarMorto) return;
     if (this.estado === 'preso') return;
     this.vel.copy(vel);
@@ -106,7 +108,9 @@ export class Entidade {
   }
 
   ia() {}
-  caido(dt) { if (this.tempoEstado > 2.5) { this.estado = 'normal'; this.obj.rotation.set(0, this.obj.rotation.y, 0); this.pos.y = 0.2; } }
+  caido(dt) {
+    if (this.noTeto) { if (this.tempoEstado > 8) this.remover = true; return; }
+    if (this.tempoEstado > 2.5) { this.estado = 'normal'; this.obj.rotation.set(0, this.obj.rotation.y, 0); this.pos.y = 0.2; } }
   morto(dt) {
     if (this.voandoMorto) this.fisicaArremesso(dt);
     if (this.tempoEstado > 12) this.remover = true;
@@ -127,15 +131,26 @@ export class Entidade {
       this.centro(_c);
       // prédios
       if (jogo.predios.solido(_c.x, _c.y, _c.z)) {
-        this.impacto(v);
-        if (v > 32 && (this.estado === 'arremessado' || this.voandoMorto)) {
+        if (v > 12) this.impacto(v);
+        if (this.estado !== 'arremessado' && !this.voandoMorto) return;
+        if (v > 32) {
           // rápido demais: atravessa a parede e continua voando
           this.vel.multiplyScalar(0.72);
           continue;
         }
-        this.vel.multiplyScalar(-0.15);
-        if (this.estado !== 'arremessado' && !this.voandoMorto) return;
-        this.pos.addScaledVector(this.vel, h * 2);
+        // devagar: volta para fora do bloco
+        this.pos.addScaledVector(this.vel, -h);
+        this.centro(_c);
+        if (jogo.predios.solido(_c.x, _c.y, _c.z)) this.pos.y += 0.6; // nasceu dentro: empurra para cima
+        if (this.vel.y < 0) {
+          // caiu em cima de um telhado
+          this.vel.y = 0;
+          this.vel.x *= 0.5; this.vel.z *= 0.5;
+          if (Math.hypot(this.vel.x, this.vel.z) < 3) { this.pousarNoTeto(); return; }
+        } else {
+          this.vel.x *= -0.3; this.vel.z *= -0.3;
+        }
+        continue;
       }
       // outras entidades
       if (v > 15) {
@@ -188,6 +203,17 @@ export class Entidade {
   }
 
   aoAterrissarMorto() { this.obj.rotation.set(0, this.obj.rotation.y, 0); }
+
+  // parou em cima de um prédio: fica deitado lá e some depois
+  pousarNoTeto() {
+    this.vel.set(0, 0, 0);
+    this.giro.set(0, 0, 0);
+    this.obj.rotation.set(-Math.PI / 2, this.obj.rotation.y, 0);
+    if (this.estado === 'morto') { this.voandoMorto = false; this.noTeto = true; return; }
+    this.estado = 'caido';
+    this.tempoEstado = 0;
+    this.noTeto = true;
+  }
 
   pousar() {
     if (this.estado === 'morto') return;

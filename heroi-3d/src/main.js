@@ -97,7 +97,7 @@ class Jogo {
   congelar(t) { this.congelado = Math.max(this.congelado || 0, t); }
   tremerPerto(pos, qtd) {
     const d = pos.distanceTo(this.heroi.pos);
-    const f = Math.max(0, 1 - d / 120);
+    const f = Math.max(0, 1 - d / 90);
     if (f > 0) this.camera.tremer(qtd * f);
   }
   perigoPerto(pos) {
@@ -110,6 +110,7 @@ class Jogo {
 
   // explosão: efeitos + dano em prédios, entidades e no herói
   explosao(pos, raio, dano, origem = 'heroi', fonte = null) {
+    if (!Number.isFinite(pos.x + pos.y + pos.z)) return; // proteção contra posição inválida
     this.efeitos.explosao(pos, raio);
     this.audio?.explosao(raio / 8, pos);
     this.tremerPerto(pos, Math.min(1, raio / 10));

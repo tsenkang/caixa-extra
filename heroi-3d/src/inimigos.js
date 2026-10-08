@@ -60,7 +60,8 @@ export class Projeteis {
     mesh.castShadow = true;
     mesh.position.copy(origem);
     this.jogo.cena.add(mesh);
-    this.misseis.push({ mesh, pos: mesh.position, vel: dir.clone().multiplyScalar(op.vel), vida: 0, ...op });
+    // atenção: op.vel é um número (velocidade); o vetor vel vem depois para não ser sobrescrito
+    this.misseis.push({ ...op, mesh, pos: mesh.position, vel: dir.clone().multiplyScalar(op.vel), vida: 0 });
     if (!op.pedra) this.jogo.audio?.missil(origem);
   }
 
