@@ -121,7 +121,7 @@ export class Laser {
 
     // dano
     if (mira.tipo === 'entidade') {
-      mira.entidade.levarDano(170 * dt, 'heroi');
+      mira.entidade.levarDano(170 * dt * (mira.entidade.resistenciaLaser ?? 1), 'heroi');
     } else if (mira.tipo === 'predio') {
       _vel.copy(mira.normal).multiplyScalar(5);
       jogo.predios.danificarEsfera(ponto, 1.8, 110 * dt, { velBase: _vel, forca: 6, origem: 'heroi', pedacos: 4 });

@@ -402,6 +402,7 @@ export class HeroiInimigo extends Entidade {
     this.variante = tipo;
     this.chefe = true;
     this.nome = cfg.nome;
+    if (tipo === 'rapido') this.resistenciaLaser = 0.55; // vibra tão rápido que o laser pega só de raspão
     this.corBarra = cfg.corBarra;
     this.fase = 'mover';
     this.timer = 2;
@@ -446,10 +447,20 @@ export class HeroiInimigo extends Entidade {
     }
     super.atualizar(dt);
     // heróis que voam se recuperam no ar depois de arremessados (em vez de cair)
-    if (this.estado === 'arremessado' && this.variante !== 'gigante' && this.tempoEstado > 0.3) {
+    if (this.estado === 'arremessado' && this.variante !== 'gigante' && this.tempoEstado > (this.variante === 'rapido' ? 0.12 : 0.3)) {
       this.vel.multiplyScalar(Math.max(0, 1 - dt * 2.2));
       this.vel.y += 22 * dt;
-      if (this.vel.length() < 10) { this.estado = 'normal'; this.obj.rotation.set(0, this.obj.rotation.y, 0); this.atordoar(0.4); }
+      const limite = this.variante === 'rapido' ? 35 : 10; // o Corisco se recupera muito mais rápido
+      if (this.vel.length() < limite) {
+        this.estado = 'normal';
+        this.obj.rotation.set(0, this.obj.rotation.y, 0);
+        if (this.variante === 'rapido') {
+          // em vez de ficar tonto, dispara para longe
+          this.fase = 'recuar'; this.timer = 0.5;
+          const a = Math.random() * Math.PI * 2;
+          this.vel.set(Math.cos(a) * 150, 20, Math.sin(a) * 150);
+        } else this.atordoar(0.4);
+      }
     }
     if (this.estado === 'normal') this.animar(dt, this.velAnim, this.variante !== 'gigante');
   }
@@ -576,49 +587,113 @@ export class HeroiInimigo extends Entidade {
     if (this.velAnim > 10) this.quebrarCaminho(1.1);
   }
 
+  // Corisco: mais rápido que o herói (que chega a 115 m/s com Shift)
+  //  cercar (circula em zigue-zague) -> avanço (180 m/s) -> rajada de socos -> pausa (brecha!) -> recuo (150 m/s)
   iaRapido(dt) {
     const jogo = this.jogo;
     const heroi = jogo.heroi;
     heroi.centro(_h);
     this.timer -= dt;
+    this.esquiva = (this.esquiva ?? 0) - dt;
     this.centro(_c);
-    if (this.fase === 'mover') {
-      // avança em alta velocidade
-      _d.subVectors(_h, _c);
-      const dist = _d.length();
-      _d.normalize().multiplyScalar(75);
-      this.vel.lerp(_d, Math.min(1, dt * 5));
-      if (dist < 2.8 && !heroi.morto) {
-        heroi.levarDano(18);
-        _v.copy(_d).normalize().multiplyScalar(85).y += 8;
-        heroi.vel.copy(_v); // o herói sai voando (e atravessa o que tiver no caminho)
-        heroi.atordoado = 0.5;
-        this.jogo.congelar(0.07);
-        this.soco = 1;
-        jogo.camera.tremer(0.5);
-        jogo.efeitos.ondaDeChoque(_h, 5, 0.3, 0xfff1a0, _v.normalize());
-        jogo.audio?.soco(0.7);
-        this.fase = 'recuar';
-        this.timer = 1.1;
-        const a = Math.random() * Math.PI * 2;
-        this.vel.set(Math.cos(a) * 60, 15, Math.sin(a) * 60);
+    const dist = _c.distanceTo(_h);
+    if (!this.fase || this.fase === 'mover' || this.fase === 'esperar') { this.fase = 'cercar'; this.timer = 1; }
+
+    // desvia do laser e do avanço do herói com um "teleporte" lateral
+    const mirandoNele = (jogo.laser.ativo && jogo.mira.entidade === this) || jogo.combate?.avanco?.alvo === this;
+    if (mirandoNele && this.esquiva <= 0 && this.fase !== 'rajada' && this.fase !== 'pausa') {
+      this.esquiva = 0.4;
+      if (Math.random() < 0.85) this.teleporteLateral();
+    }
+
+    if (this.fase === 'cercar') {
+      // circula em volta do herói bem rápido, mudando de raio (zigue-zague)
+      this.angulo += dt * 4.2 * (this.sentido || (this.sentido = Math.random() < 0.5 ? 1 : -1));
+      const r = 28 + Math.sin(jogo.tempo * 7) * 8;
+      _v.set(_h.x + Math.cos(this.angulo) * r, Math.max(2, _h.y + Math.sin(jogo.tempo * 5) * 6), _h.z + Math.sin(this.angulo) * r);
+      _d.subVectors(_v, this.pos).multiplyScalar(6);
+      if (_d.length() > 150) _d.setLength(150);
+      this.vel.lerp(_d, Math.min(1, dt * 8));
+      if (this.timer <= 0 || dist > 150) {
+        this.fase = 'avanco'; this.timer = 1.2;
+        _d.subVectors(_h, _c).normalize();
+        jogo.efeitos.ondaDeChoque(_c, 4, 0.25, 0xfff6c0, _d); // estrondo sônico na largada
+        jogo.audio?.arremesso();
       }
-      if (this.timer < -5) { this.fase = 'recuar'; this.timer = 1; }
+    } else if (this.fase === 'avanco') {
+      // dispara em linha reta a 180 m/s, corrigindo a mira
+      _d.subVectors(_h, _c).normalize().multiplyScalar(180);
+      this.vel.lerp(_d, Math.min(1, dt * 12));
+      if (dist < 3.2 && !heroi.morto) { this.fase = 'rajada'; this.timer = 0; this.golpes = 0; }
+      else if (this.timer <= 0) { this.fase = 'cercar'; this.timer = 0.8; }
+    } else if (this.fase === 'rajada') {
+      // gruda na frente do herói e dá 4 socos rapidíssimos (o último manda longe)
+      _d.subVectors(_c, _h).normalize();
+      this.pos.copy(_h).addScaledVector(_d, 2.2).y -= this.altura * 0.5;
+      this.vel.copy(heroi.vel);
+      if (this.timer <= 0) {
+        this.timer = 0.11;
+        this.golpes++;
+        this.soco = 1;
+        _v.copy(_h).lerp(_c, 0.4);
+        jogo.efeitos.faiscas(_v, 8, 12, [1, 0.9, 0.4]);
+        if (this.golpes < 4) {
+          heroi.levarDano(6);
+          heroi.vel.addScaledVector(_d, -12);
+          jogo.camera.tremer(0.15);
+          jogo.audio?.impacto(0.5, _v);
+        } else {
+          this.socoNoHeroi(14, 95);
+          this.fase = 'pausa'; this.timer = 0.5; // brecha para o herói revidar
+        }
+      }
+    } else if (this.fase === 'pausa') {
+      this.vel.multiplyScalar(Math.max(0, 1 - dt * 6));
+      if (this.timer <= 0) {
+        this.fase = 'recuar'; this.timer = 0.55;
+        const a = Math.random() * Math.PI * 2;
+        this.vel.set(Math.cos(a) * 150, 25, Math.sin(a) * 150);
+      }
     } else if (this.fase === 'recuar') {
-      if (this.timer <= 0) { this.fase = 'esperar'; this.timer = 0.6 + Math.random() * 0.8; }
-    } else {
-      this.vel.multiplyScalar(Math.max(0, 1 - dt * 3));
-      if (this.timer <= 0) { this.fase = 'mover'; this.timer = 0; }
+      if (this.timer <= 0) { this.fase = 'cercar'; this.timer = 0.8 + Math.random() * 1.2; }
     }
-    this.pos.addScaledVector(this.vel, dt);
+
+    // move em 2 passos (a 180 m/s anda 3 m por quadro) quebrando o que tiver no caminho
+    for (let p = 0; p < 2; p++) {
+      this.pos.addScaledVector(this.vel, dt / 2);
+      if (this.vel.lengthSq() > 400) this.quebrarCaminho(1.1);
+    }
     if (this.pos.y < 0.5) { this.pos.y = 0.5; this.vel.y = Math.abs(this.vel.y); }
-    this.olharPara(this.fase === 'esperar' ? _h : _v.copy(this.pos).add(this.vel), dt, 12);
+    const olhar = this.fase === 'pausa' || this.fase === 'rajada' ? _h : _v.copy(this.pos).add(this.vel);
+    this.olharPara(olhar, dt, 14);
     this.velAnim = this.vel.length();
-    // rastro amarelo
-    if (this.velAnim > 20) {
-      jogo.efeitos.aditivo.emitir(_c.x, _c.y, _c.z, { vx: 0, vy: 0, vz: 0, vida: 0.35, tamIni: 1.4, tamFim: 0.2, alfa: 0.8, gravidade: 0, arrasto: 0, r: 1, g: 0.85, b: 0.2 });
-      this.quebrarCaminho(1);
+    if (this.velAnim > 30) this.rastro(1);
+  }
+
+  // vulto amarelo deixado pelo caminho (cabeça, tronco e pernas)
+  rastro(intensidade) {
+    const ef = this.jogo.efeitos;
+    for (const h of [0.15, 0.5, 0.85]) {
+      ef.aditivo.emitir(this.pos.x, this.pos.y + this.altura * h, this.pos.z, {
+        vx: 0, vy: 0, vz: 0, vida: 0.3, tamIni: 1.1 * intensidade, tamFim: 0.2, alfa: 0.7, gravidade: 0, arrasto: 0, r: 1, g: 0.82, b: 0.2,
+      });
     }
+  }
+
+  // "teleporte": um passo lateral instantâneo de ~12 m, deixando um rastro de vulto
+  teleporteLateral() {
+    const jogo = this.jogo;
+    _d.subVectors(this.pos, jogo.heroi.pos).setY(0).normalize();
+    const lado = Math.random() < 0.5 ? 1 : -1;
+    _v.set(-_d.z * lado, (Math.random() - 0.3) * 0.5, _d.x * lado).normalize().multiplyScalar(12);
+    for (let i = 0; i <= 6; i++) {
+      const t = i / 6;
+      _c.copy(this.pos).addScaledVector(_v, t);
+      jogo.efeitos.aditivo.emitir(_c.x, _c.y + this.altura * 0.5, _c.z, { vx: 0, vy: 0, vz: 0, vida: 0.35, tamIni: 2.2, tamFim: 0.3, alfa: 0.6, gravidade: 0, arrasto: 0, r: 1, g: 0.85, b: 0.25 });
+    }
+    this.pos.add(_v);
+    if (this.pos.y < 0.5) this.pos.y = 0.5;
+    jogo.efeitos.faiscas(_c.copy(this.pos).y += this.altura * 0.5, 6, 8, [1, 0.9, 0.3]);
   }
 
   iaGigante(dt) {
