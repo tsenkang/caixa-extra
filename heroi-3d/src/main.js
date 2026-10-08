@@ -10,6 +10,7 @@ import { Heroi } from './heroi.js';
 import { Populacao } from './entidades.js';
 import { Mira, Laser, Soco, Agarrar } from './poderes.js';
 import { Hud } from './hud.js';
+import { Projeteis, Alerta } from './inimigos.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Vector3();
@@ -50,6 +51,9 @@ class Jogo {
     this.agarrar = new Agarrar(this);
     this.hud = new Hud(this);
     this.stats = { inimigos: 0, pessoas: 0 };
+    this.projeteis = new Projeteis(this);
+    this.alerta = new Alerta(this);
+    this.controles.aoPerderTrava = () => { if (!this.acabou && !this.pausado) this.pausar(); };
 
     this.relogio = new THREE.Clock();
     this.fps = { quadros: 0, tempo: 0, el: document.getElementById('fps') };
@@ -63,7 +67,11 @@ class Jogo {
   }
 
   // ---------- ganchos chamados pelos sistemas ----------
+  aoQuebrarBloco(p) { if (p.origem === 'heroi') this.alerta?.adicionar(1); }
+  aoNocautear() { this.stats.pessoas++; this.alerta.adicionar(8); }
+  aoInimigoDerrotado(e) { this.stats.inimigos++; this.alerta.adicionar(6); }
   aoDestruirPredio(p) {
+    if (p.origem === 'heroi') this.alerta.adicionar(25);
     this.hud.mensagem(p.nome === 'casa' ? 'CASA DESTRUÍDA!' : 'PRÉDIO DESTRUÍDO!', '#fbbf24');
   }
   aoDesabar(centro, qtd) {
@@ -139,11 +147,14 @@ class Jogo {
       if (this.entidades[i].remover) { this.entidades[i].destruir(); this.entidades.splice(i, 1); }
     }
     this.populacao.atualizar(dt);
+    this.projeteis.atualizar(dt);
+    this.alerta.atualizar(dt);
     for (let i = this.perigos.length - 1; i >= 0; i--) if ((this.perigos[i].tempo -= dt) <= 0) this.perigos.splice(i, 1);
 
     this.predios.atualizar(dt);
     this.detritos.atualizar(dt);
     this.efeitos.atualizar(dt, this.cam3, this.renderer.domElement.clientHeight);
+    this.alertaMax = Math.max(this.alertaMax || 0, this.alerta.nivel);
     this.hud.atualizar(dt);
     ctrl.limpar();
   }
@@ -157,6 +168,29 @@ class Jogo {
       f.quadros = 0;
       f.tempo = 0;
     }
+  }
+
+  pausar() {
+    this.pausado = true;
+    this.audio?.laser(false);
+    document.getElementById('pausa').classList.remove('escondido');
+  }
+  continuar() {
+    document.getElementById('pausa').classList.add('escondido');
+    this.pausado = false;
+    this.relogio.getDelta();
+    this.controles.travar();
+  }
+  fimDeJogo() {
+    this.acabou = true;
+    setTimeout(() => {
+      this.pausado = true;
+      this.audio?.laser(false);
+      document.exitPointerLock?.();
+      document.getElementById('fim-texto').innerHTML =
+        `Prédios destruídos: <b>${this.predios.destruidos}</b><br>Inimigos derrotados: <b>${this.stats.inimigos}</b><br>Blocos quebrados: <b>${this.predios.blocosQuebrados}</b><br>Alerta máximo: <b>${'★'.repeat(this.alertaMax || 0) || '-'}</b>`;
+      document.getElementById('fim').classList.remove('escondido');
+    }, 1500);
   }
 
   comecar() {
@@ -181,3 +215,6 @@ window.jogo = jogo; // ajuda nos testes pelo console
 const btn = document.getElementById('btn-jogar');
 document.getElementById('carregando').textContent = '';
 btn.addEventListener('click', () => jogo.comecar());
+document.getElementById('btn-continuar').addEventListener('click', () => jogo.continuar());
+for (const id of ['btn-reiniciar', 'btn-reiniciar2']) document.getElementById(id).addEventListener('click', () => location.reload());
+addEventListener('keydown', (e) => { if (e.code === 'KeyP' && !jogo.acabou) (jogo.pausado ? jogo.continuar() : jogo.pausar()); });
