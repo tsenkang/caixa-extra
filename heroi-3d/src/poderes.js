@@ -81,6 +81,8 @@ export class Laser {
     this.superaquecido = false;
     this.ativo = false;
     this.tempoFumaca = 0;
+    this.inicio = new THREE.Vector3(); // feixe atual (usado no choque de raios)
+    this.fim = new THREE.Vector3();
   }
 
   atualizar(dt, querAtirar) {
@@ -108,10 +110,14 @@ export class Laser {
     const mira = jogo.mira;
     const ponto = mira.ponto;
     // raio sai dos dois olhos
+    this.inicio.set(0, 0, 0);
     heroi.rig.olhos.forEach((olho, i) => {
       olho.getWorldPosition(_olho);
-      this.raios[i].mostrar(_olho, ponto, jogo.tempo + i);
+      this.inicio.addScaledVector(_olho, 0.5);
+      if (!jogo.choque?.ativo) this.raios[i].mostrar(_olho, ponto, jogo.tempo + i);
     });
+    this.fim.copy(ponto);
+    if (jogo.choque?.ativo) return; // raios travados no choque: quem desenha e causa dano é o choque
 
     // dano
     if (mira.tipo === 'entidade') {

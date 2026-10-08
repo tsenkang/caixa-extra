@@ -11,6 +11,7 @@ import { Populacao } from './entidades.js';
 import { Mira, Laser, Soco, Agarrar } from './poderes.js';
 import { Hud } from './hud.js';
 import { Combate } from './combate.js';
+import { ChoqueDeRaios } from './choque.js';
 import { Audio } from './audio.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -80,6 +81,7 @@ class Jogo {
     this.soco = new Soco(this);
     this.agarrar = new Agarrar(this);
     this.combate = new Combate(this);
+    this.choque = new ChoqueDeRaios(this);
     this.hud = new Hud(this);
     this.stats = { inimigos: 0, pessoas: 0 };
     this.projeteis = new Projeteis(this);
@@ -163,6 +165,7 @@ class Jogo {
   // ---------- loop ----------
   quadro() {
     let dt = Math.min(0.05, this.relogio.getDelta());
+    this.choque?.atualizarFlash(dt);
     // "congelamento" rápido nos impactos fortes (dá peso ao golpe)
     if (this.congelado > 0) { this.congelado -= dt; dt *= 0.08; }
     else if (this.lento > 0) { this.lento -= dt; dt *= 0.3; } // câmera lenta no golpe final
@@ -197,6 +200,7 @@ class Jogo {
     for (let i = this.entidades.length - 1; i >= 0; i--) {
       if (this.entidades[i].remover) { this.entidades[i].destruir(); this.entidades.splice(i, 1); }
     }
+    this.choque.atualizar(dt);
     this.populacao.atualizar(dt);
     this.projeteis.atualizar(dt);
     this.alerta.atualizar(dt);

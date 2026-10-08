@@ -424,6 +424,8 @@ export class HeroiInimigo extends Entidade {
   }
 
   atualizar(dt) {
+    // o feixe só vale enquanto ele está de fato atirando
+    if (this.feixe && (this.fase !== 'raio' || this.atordoadoT > 0 || this.estado !== 'normal')) this.feixe.ativo = false;
     if (this.estado === 'preso') {
       // se solta depois de um tempo
       this.tempoEstado += dt;
@@ -440,7 +442,7 @@ export class HeroiInimigo extends Entidade {
       return;
     }
     if (this.estado === 'normal' || this.estado === 'arremessado' || this.estado === 'caido') {
-      if (this.estado !== 'normal') this.raio3d?.esconder();
+      if (this.estado !== 'normal') { this.raio3d?.esconder(); if (this.feixe) this.feixe.ativo = false; }
     }
     super.atualizar(dt);
     // heróis que voam se recuperam no ar depois de arremessados (em vez de cair)
@@ -452,7 +454,7 @@ export class HeroiInimigo extends Entidade {
     if (this.estado === 'normal') this.animar(dt, this.velAnim, this.variante !== 'gigante');
   }
 
-  aoSerPego() { this.tempoEstado = 0; this.raio3d?.esconder(); }
+  aoSerPego() { this.tempoEstado = 0; this.raio3d?.esconder(); if (this.feixe) this.feixe.ativo = false; }
 
   animar(dt, vel, voando) {
     animarHumanoide(this.rig, {
@@ -548,17 +550,24 @@ export class HeroiInimigo extends Entidade {
       let fim = hit ? hit.dist : 150;
       // acertou o herói?
       _v.copy(_c).addScaledVector(_d, fim);
-      if (!heroi.morto && distSegmento(_h, _c, _v) < 1.4) {
+      if (jogo.choque?.ativo === this) { /* raios travados: sem dano */ }
+      else if (!heroi.morto && distSegmento(_h, _c, _v) < 1.4) {
         heroi.levarDano(32 * dt);
         fim = Math.min(fim, _c.distanceTo(_h));
         _v.copy(_c).addScaledVector(_d, fim);
       } else if (hit) {
         jogo.predios.danificarEsfera(hit.ponto, 2, 140 * dt, { origem: 'inimigo', forca: 5, pedacos: 2 });
       }
-      this.raio3d.mostrar(_c, _v, jogo.tempo);
-      jogo.efeitos.faiscas(_v, 2, 9, [0.5, 0.8, 1]);
-      jogo.efeitos.brilho(_v, 3, 0.3, 0.6, 1);
-      if (this.timer <= 0) { this.fase = 'mover'; this.timer = 3 + Math.random() * 2; this.raio3d.esconder(); jogo.audio?.raioAzul(false); }
+      // guarda o feixe para o choque de raios (choque.js)
+      this.feixe = this.feixe || { a: new THREE.Vector3(), b: new THREE.Vector3(), ativo: false };
+      this.feixe.a.copy(_c); this.feixe.b.copy(_v); this.feixe.ativo = true;
+      if (jogo.choque?.ativo === this) this.timer = Math.max(this.timer, 0.3); // não para no meio do choque
+      else {
+        this.raio3d.mostrar(_c, _v, jogo.tempo);
+        jogo.efeitos.faiscas(_v, 2, 9, [0.5, 0.8, 1]);
+        jogo.efeitos.brilho(_v, 3, 0.3, 0.6, 1);
+      }
+      if (this.timer <= 0) { this.fase = 'mover'; this.timer = 3 + Math.random() * 2; this.raio3d.esconder(); this.feixe.ativo = false; jogo.audio?.raioAzul(false); }
     }
     this.pos.addScaledVector(this.vel, dt);
     if (this.pos.y < 2) this.pos.y = 2;
@@ -684,6 +693,7 @@ export class HeroiInimigo extends Entidade {
     this.estado = 'morto';
     this.tempoEstado = 0;
     this.raio3d?.esconder();
+    if (this.feixe) this.feixe.ativo = false;
     this.centro(_c);
     const k = this.rig.raiz.scale.x;
     const cor = { raio: [0.4, 0.75, 1], rapido: [1, 0.85, 0.2], gigante: [0.75, 0.35, 1] }[this.variante];
