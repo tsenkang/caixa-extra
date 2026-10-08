@@ -173,17 +173,11 @@ export class Soldado extends Entidade {
   }
 
   morrer() {
-    this.estado = 'morto';
-    this.tempoEstado = 0;
-    this.obj.rotation.x = -Math.PI / 2;
-    this.pos.y = Math.max(0.3, this.pos.y);
+    this.iniciarMorte();
     this.jogo.aoInimigoDerrotado(this);
   }
-  aoAterrissarMorto() { this.obj.rotation.set(-Math.PI / 2, this.obj.rotation.y, 0); this.pos.y = 0.3; }
-  morto(dt) {
-    if (this.voandoMorto) { this.fisicaArremesso(dt); return; }
-    if (this.tempoEstado > 8) { this.obj.scale.multiplyScalar(0.9); if (this.tempoEstado > 9) this.remover = true; }
-  }
+  aoAterrissarMorto() { this.alvoDeitado = null; this.chaoMorto = 0.14; }
+  morto(dt) { this.corpoCaido(dt); }
 }
 
 // ---------- veículos militares (andam pelas ruas até o herói) ----------
@@ -683,22 +677,78 @@ export class HeroiInimigo extends Entidade {
     }
   }
 
+  // derrota: explosão de energia na cor do herói, câmera lenta e o corpo cai mole
   morrer() {
     if (this.estado === 'morto') return;
+    const jogo = this.jogo;
     this.estado = 'morto';
     this.tempoEstado = 0;
     this.raio3d?.esconder();
     this.centro(_c);
-    this.jogo.efeitos.explosao(_c, 4 * (this.variante === 'gigante' ? 3 : 1));
-    this.jogo.hud.mensagem(`${this.nome} DERROTADO!`, '#4ade80');
-    this.jogo.aoInimigoDerrotado(this);
-    this.voandoMorto = this.pos.y > 0.5;
+    const k = this.rig.raiz.scale.x;
+    const cor = { raio: [0.4, 0.75, 1], rapido: [1, 0.85, 0.2], gigante: [0.75, 0.35, 1] }[this.variante];
+    const hex = { raio: 0x7dd3fc, rapido: 0xfde047, gigante: 0xc084fc }[this.variante];
+    jogo.efeitos.faiscas(_c, 45, 18 + k * 2, cor);
+    jogo.efeitos.ondaDeChoque(_c, 6 * k + 6, 0.6, hex);
+    jogo.efeitos.brilho(_c, 4 * k, cor[0], cor[1], cor[2]);
+    jogo.camaraLenta(0.7);
+    jogo.congelar(0.1);
+    jogo.tremerPerto(_c, 0.5);
+    jogo.audio?.soco(1.2);
+    jogo.hud.mensagem(`${this.nome} DERROTADO!`, '#4ade80');
+    jogo.aoInimigoDerrotado(this);
+    this.rig.raiz.rotation.order = 'YXZ';
+    this.caindo = this.pos.y > 0.3;
+    this.vel.multiplyScalar(0.5);
+    this.vel.y = Math.max(this.vel.y, 3);
+    this.voandoMorto = false;
   }
-  aoAterrissarMorto() { this.obj.rotation.set(-Math.PI / 2, this.obj.rotation.y, 0); this.pos.y = 0.3 * this.rig.raiz.scale.x; }
+
   morto(dt) {
-    if (this.voandoMorto) { this.fisicaArremesso(dt); return; }
-    if (this.obj.rotation.x === 0) this.aoAterrissarMorto();
-    if (this.tempoEstado > 10) this.remover = true;
+    const jogo = this.jogo;
+    const r = this.rig;
+    const k = r.raiz.scale.x;
+    if (this.voandoMorto) { this.voandoMorto = false; this.caindo = true; } // corpo arremessado de novo
+    if (this.caindo) {
+      this.vel.y -= 28 * dt;
+      this.vel.x *= Math.max(0, 1 - dt * 0.6); this.vel.z *= Math.max(0, 1 - dt * 0.6);
+      this.pos.addScaledVector(this.vel, dt);
+      const cel = jogo.predios.celulaEm(this.pos.x, this.pos.y, this.pos.z);
+      if (cel) { this.pos.y = cel.topo; this.aterrissarDerrotado(); }
+      else if (this.pos.y <= 0) { this.pos.y = 0; this.aterrissarDerrotado(); }
+    }
+    // pose mole: deitado de costas, braços abertos
+    const s = Math.min(1, dt * (this.caindo ? 2 : 6));
+    const l = (a, b) => a + (b - a) * s;
+    r.raiz.rotation.x = l(r.raiz.rotation.x, this.caindo ? -0.9 : -Math.PI / 2);
+    r.raiz.rotation.z = l(r.raiz.rotation.z, 0);
+    r.corpo.rotation.x = l(r.corpo.rotation.x, 0);
+    r.bracoE.rotation.x = l(r.bracoE.rotation.x, -0.4); r.bracoE.rotation.z = l(r.bracoE.rotation.z, 1.25);
+    r.bracoD.rotation.x = l(r.bracoD.rotation.x, -0.2); r.bracoD.rotation.z = l(r.bracoD.rotation.z, -1.1);
+    r.antebracoE.rotation.x = l(r.antebracoE.rotation.x, -0.3); r.antebracoD.rotation.x = l(r.antebracoD.rotation.x, -0.5);
+    r.pernaE.rotation.x = l(r.pernaE.rotation.x, 0); r.pernaE.rotation.z = l(r.pernaE.rotation.z, 0.18);
+    r.pernaD.rotation.x = l(r.pernaD.rotation.x, -0.25); r.pernaD.rotation.z = l(r.pernaD.rotation.z, -0.12);
+    r.canelaE.rotation.x = l(r.canelaE.rotation.x, 0.1); r.canelaD.rotation.x = l(r.canelaD.rotation.x, 0.6);
+    r.cabeca.rotation.z = l(r.cabeca.rotation.z, 0.45);
+    if (!this.caindo && !this.noChaoFinal) this.pos.y = l(this.pos.y, this.chaoFinal ?? 0.2 * k);
+    // some afundando depois de um tempo
+    if (this.tempoEstado > 14) {
+      this.pos.y -= dt * 0.35 * k;
+      if (this.tempoEstado > 18) this.remover = true;
+    }
+  }
+
+  aterrissarDerrotado() {
+    const jogo = this.jogo;
+    const k = this.rig.raiz.scale.x;
+    this.caindo = false;
+    this.vel.set(0, 0, 0);
+    this.chaoFinal = this.pos.y + 0.2 * k;
+    _c.copy(this.pos).y += 0.3;
+    jogo.efeitos.ondaDeChoque(_c, 5 + k * 3, 0.5, 0xd8c9a8);
+    jogo.efeitos.poeira(_c, 8 + k * 3, 2 + k, 4 + k);
+    jogo.tremerPerto(_c, Math.min(0.8, 0.25 * k));
+    jogo.audio?.impacto(Math.min(1, 0.4 * k), _c);
   }
 }
 

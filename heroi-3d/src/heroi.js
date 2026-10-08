@@ -319,7 +319,7 @@ export class Heroi {
   }
 
   atualizar(dt, ctrl, cam) {
-    if (this.morto) return;
+    if (this.morto) { this.animarMorte(dt); return; }
     const jogo = this.jogo;
     // ---------- movimento ----------
     _desejo.set(0, 0, 0);
@@ -430,6 +430,40 @@ export class Heroi {
     });
     if (!voando) rig.raiz.position.y += 0;
     else if (vel < 5) rig.raiz.position.y += Math.sin(rig.t * 2) * 0.08; // flutuando
+  }
+
+  // derrotado: cai mole (com gravidade) e fica estirado
+  animarMorte(dt) {
+    const rig = this.rig;
+    const pr = this.jogo.predios;
+    if (!this.noChao) {
+      this.vel.y -= 28 * dt;
+      this.vel.x *= Math.max(0, 1 - dt); this.vel.z *= Math.max(0, 1 - dt);
+      this.pos.addScaledVector(this.vel, dt);
+      const cel = pr.celulaEm(this.pos.x, this.pos.y, this.pos.z);
+      if (cel) { this.pos.y = cel.topo; this.noChao = true; }
+      else if (this.pos.y <= 0) { this.pos.y = 0; this.noChao = true; }
+      if (this.noChao) {
+        this.vel.set(0, 0, 0);
+        this.jogo.efeitos.poeira(this.pos, 8, 2, 4);
+        this.jogo.camera.tremer(0.4);
+        this.jogo.audio?.impacto(0.7, this.pos);
+      }
+    }
+    const s = Math.min(1, dt * (this.noChao ? 6 : 2));
+    const l = (a, b) => a + (b - a) * s;
+    rig.raiz.rotation.order = 'YXZ';
+    rig.raiz.rotation.x = l(rig.raiz.rotation.x, this.noChao ? -Math.PI / 2 : -0.8);
+    rig.raiz.position.copy(this.pos);
+    rig.raiz.position.y += 0.2;
+    rig.corpo.rotation.x = l(rig.corpo.rotation.x, 0);
+    rig.bracoE.rotation.z = l(rig.bracoE.rotation.z, 1.2); rig.bracoD.rotation.z = l(rig.bracoD.rotation.z, -1.2);
+    rig.bracoE.rotation.x = l(rig.bracoE.rotation.x, -0.3); rig.bracoD.rotation.x = l(rig.bracoD.rotation.x, -0.3);
+    rig.pernaE.rotation.x = l(rig.pernaE.rotation.x, 0); rig.pernaD.rotation.x = l(rig.pernaD.rotation.x, -0.3);
+    rig.canelaD.rotation.x = l(rig.canelaD.rotation.x, 0.7);
+    rig.cabeca.rotation.z = l(rig.cabeca.rotation.z, 0.4);
+    if (rig.capa) rig.capa.rotation.x = l(rig.capa.rotation.x, 0.05);
+    rig.matOlho.color.set(0xffffff);
   }
 
   levarDano(qtd) {

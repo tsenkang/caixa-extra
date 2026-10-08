@@ -84,6 +84,35 @@ export class Entidade {
 
   morrer() { this.estado = 'morto'; this.tempoEstado = 0; }
 
+  // ----- corpo depois da morte (pessoas e soldados) -----
+  // em vez de "deitar" na hora, o corpo tomba sobre os pés, assenta no chão e depois afunda e some
+  iniciarMorte() {
+    this.estado = 'morto';
+    this.tempoEstado = 0;
+    this.giro.multiplyScalar(0.25); // gira menos voando
+    this.obj.rotation.order = 'YXZ'; // tomba para frente/trás do próprio corpo
+    this.alvoDeitado = null;
+    this.ladoQueda = Math.random() < 0.5 ? 1 : -1;
+    const naCalcada = this.pos.y > 0.1 && this.pos.y < 0.5;
+    this.chaoMorto = (naCalcada ? 0.2 : 0) + 0.14;
+  }
+
+  corpoCaido(dt) {
+    if (this.voandoMorto) { this.fisicaArremesso(dt); return; }
+    const r = this.obj.rotation;
+    let x = ((r.x + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; // entre -PI e PI
+    if (this.alvoDeitado == null) this.alvoDeitado = (x > 0.15 ? 1 : x < -0.15 ? -1 : this.ladoQueda) * (Math.PI / 2);
+    const k = Math.min(1, dt * 5);
+    r.x = x + (this.alvoDeitado - x) * k;
+    r.z += (0 - r.z) * k;
+    if (!this.noTeto) this.pos.y += ((this.chaoMorto ?? 0.14) - this.pos.y) * Math.min(1, dt * 8);
+    // depois de um tempo afunda devagar no chão e some
+    if (this.tempoEstado > 10) {
+      this.pos.y -= dt * 0.35;
+      if (this.tempoEstado > 13) this.remover = true;
+    }
+  }
+
   atordoar(t) { this.atordoadoT = Math.max(this.atordoadoT || 0, t); }
 
   // empurrão (explosão, soco, herói passando)
@@ -95,7 +124,7 @@ export class Entidade {
     this.vel.copy(vel);
     this.giro.set((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 10);
     if (this.estado !== 'morto') this.estado = 'arremessado';
-    else this.voandoMorto = true;
+    else { this.voandoMorto = true; this.alvoDeitado = null; this.giro.multiplyScalar(0.3); }
     this.lancadoPorHeroi = porHeroi;
     this.tempoEstado = 0;
   }
@@ -291,21 +320,12 @@ export class Pedestre extends Entidade {
   }
 
   morrer() {
-    // nocauteado: fica deitado e some depois
-    this.estado = 'morto';
-    this.tempoEstado = 0;
-    this.obj.rotation.x = -Math.PI / 2;
-    this.pos.y = Math.max(0.2, this.pos.y);
+    // nocauteado: tomba e fica caído
+    this.iniciarMorte();
     this.jogo.aoNocautear?.(this);
   }
-  aoAterrissarMorto() { this.obj.rotation.set(-Math.PI / 2, this.obj.rotation.y, 0); this.pos.y = 0.3; }
-  morto(dt) {
-    if (this.voandoMorto) { this.fisicaArremesso(dt); return; }
-    if (this.tempoEstado > 8) {
-      this.obj.scale.multiplyScalar(0.9);
-      if (this.tempoEstado > 9) this.remover = true;
-    }
-  }
+  aoAterrissarMorto() { this.alvoDeitado = null; this.chaoMorto = 0.14; }
+  morto(dt) { this.corpoCaido(dt); }
 }
 
 // ---------- veículo que anda pelas ruas ----------

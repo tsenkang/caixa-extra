@@ -237,6 +237,7 @@ class Jogo {
   }
   fimDeJogo() {
     this.acabou = true;
+    this.camaraLenta(1.2); // queda do herói em câmera lenta
     setTimeout(() => {
       this.pausado = true;
       this.audio?.laser(false);
@@ -244,7 +245,7 @@ class Jogo {
       document.getElementById('fim-texto').innerHTML =
         `Prédios destruídos: <b>${this.predios.destruidos}</b><br>Inimigos derrotados: <b>${this.stats.inimigos}</b><br>Blocos quebrados: <b>${this.predios.blocosQuebrados}</b><br>Alerta máximo: <b>${'★'.repeat(this.alertaMax || 0) || '-'}</b>`;
       document.getElementById('fim').classList.remove('escondido');
-    }, 1500);
+    }, 2600);
   }
 
   comecar() {
