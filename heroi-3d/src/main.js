@@ -10,6 +10,7 @@ import { Heroi } from './heroi.js';
 import { Populacao } from './entidades.js';
 import { Mira, Laser, Soco, Agarrar } from './poderes.js';
 import { Hud } from './hud.js';
+import { Combate } from './combate.js';
 import { Audio } from './audio.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -78,6 +79,7 @@ class Jogo {
     this.laser = new Laser(this);
     this.soco = new Soco(this);
     this.agarrar = new Agarrar(this);
+    this.combate = new Combate(this);
     this.hud = new Hud(this);
     this.stats = { inimigos: 0, pessoas: 0 };
     this.projeteis = new Projeteis(this);
@@ -119,6 +121,7 @@ class Jogo {
     this.audio?.desabamento(Math.min(1, qtd / 200), centro);
   }
   congelar(t) { this.congelado = Math.max(this.congelado || 0, t); }
+  camaraLenta(t) { this.lento = Math.max(this.lento || 0, t); }
   tremerPerto(pos, qtd) {
     const d = pos.distanceTo(this.heroi.pos);
     const f = Math.max(0, 1 - d / 90);
@@ -162,9 +165,11 @@ class Jogo {
     let dt = Math.min(0.05, this.relogio.getDelta());
     // "congelamento" rápido nos impactos fortes (dá peso ao golpe)
     if (this.congelado > 0) { this.congelado -= dt; dt *= 0.08; }
+    else if (this.lento > 0) { this.lento -= dt; dt *= 0.3; } // câmera lenta no golpe final
     if (!this.pausado) this.atualizar(dt);
     if (this.pausado) this.camera.atualizar(0, this.heroi, this.predios);
-    this.efeitos.desenharVento(dt, this.heroi.superVelocidade && !this.pausado ? Math.min(1, this.heroi.vel.length() / 100) : 0);
+    const ventoForte = (this.heroi.superVelocidade || this.heroi.dash > 0) && !this.pausado;
+    this.efeitos.desenharVento(dt, ventoForte ? Math.min(1, this.heroi.vel.length() / 100) : 0);
     // céu e sombra seguem o herói
     this.ceu.position.copy(this.cam3.position);
     const h = this.heroi.pos;
@@ -186,6 +191,7 @@ class Jogo {
     this.laser.atualizar(dt, ctrl.mouseEsq);
     this.soco.atualizar(dt, ctrl.apertou('KeyE'));
     this.agarrar.atualizar(dt, ctrl);
+    this.combate.atualizar(dt, ctrl);
 
     for (const e of this.entidades) e.atualizar(dt);
     for (let i = this.entidades.length - 1; i >= 0; i--) {

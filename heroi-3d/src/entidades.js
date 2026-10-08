@@ -84,6 +84,8 @@ export class Entidade {
 
   morrer() { this.estado = 'morto'; this.tempoEstado = 0; }
 
+  atordoar(t) { this.atordoadoT = Math.max(this.atordoadoT || 0, t); }
+
   // empurrão (explosão, soco, herói passando)
   lancar(vel, porHeroi = true) {
     if (!Number.isFinite(vel.x + vel.y + vel.z)) return; // proteção contra valor inválido
@@ -101,7 +103,15 @@ export class Entidade {
   atualizar(dt) {
     this.tempoEstado += dt;
     switch (this.estado) {
-      case 'normal': this.ia(dt); break;
+      case 'normal':
+        if (this.atordoadoT > 0) {
+          // atordoado pelo soco: só desliza, sem agir
+          this.atordoadoT -= dt;
+          this.pos.addScaledVector(this.vel, dt);
+          this.vel.multiplyScalar(Math.max(0, 1 - dt * 4));
+          if (this.pos.y < 0) this.pos.y = 0;
+        } else this.ia(dt);
+        break;
       case 'arremessado': this.fisicaArremesso(dt); break;
       case 'caido': this.caido(dt); break;
       case 'morto': this.morto(dt); break;
@@ -201,7 +211,7 @@ export class Entidade {
     jogo.efeitos?.faiscas(_c, 8, 12);
     jogo.tremerPerto(_c, Math.min(0.6, forca / 300));
     jogo.audio?.impacto(Math.min(1, forca / 200), _c);
-    if (this.estado !== 'morto') this.levarDano(v * 1.5, origem);
+    if (this.estado !== 'morto') this.levarDano(v * (this.chefe ? 0.45 : 1.5), origem); // heróis aguentam mais pancada
   }
 
   aoAterrissarMorto() { this.obj.rotation.set(0, this.obj.rotation.y, 0); }

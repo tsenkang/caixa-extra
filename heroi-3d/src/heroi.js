@@ -224,7 +224,11 @@ export function animarHumanoide(rig, e) {
     bEz = 0.12 + Math.sin(t * 1.5) * 0.02; bDz = -bEz;
   }
   if (e.segurando) { bEx = bDx = -1.45; bEz = -0.15; bDz = 0.15; }
-  if (e.soco > 0) { const s = Math.sin(e.soco * Math.PI); bDx = lerp(bDx, -1.6, s); bDz = lerp(bDz, 0.1, s); }
+  const sSoco = e.soco > 0 ? Math.sin(e.soco * Math.PI) : 0;
+  if (e.soco > 0) {
+    if (e.socoLado === -1) { bEx = lerp(bEx, -1.6, sSoco); bEz = lerp(bEz, -0.1, sSoco); }
+    else { bDx = lerp(bDx, -1.6, sSoco); bDz = lerp(bDz, 0.1, sSoco); }
+  }
 
   // dobra dos cotovelos e joelhos
   let cE = -0.25, cD = -0.25, jE = 0.05, jD = 0.05;
@@ -237,14 +241,14 @@ export function animarHumanoide(rig, e) {
     cE = cD = -0.45 - Math.min(0.6, e.andar * 0.03);
   }
   if (e.segurando) cE = cD = -0.5;
-  if (e.soco > 0) cD = lerp(cD, 0, Math.sin(e.soco * Math.PI));
+  if (e.soco > 0) { if (e.socoLado === -1) cE = lerp(cE, 0, sSoco); else cD = lerp(cD, 0, sSoco); }
   if (rig.antebracoE) {
-    rig.antebracoE.rotation.x = lerp(rig.antebracoE.rotation.x, cE, k);
+    rig.antebracoE.rotation.x = lerp(rig.antebracoE.rotation.x, cE, e.soco > 0 ? 1 : k);
     rig.antebracoD.rotation.x = lerp(rig.antebracoD.rotation.x, cD, e.soco > 0 ? 1 : k);
     rig.canelaE.rotation.x = lerp(rig.canelaE.rotation.x, jE, k);
     rig.canelaD.rotation.x = lerp(rig.canelaD.rotation.x, jD, k);
   }
-  rig.bracoE.rotation.x = lerp(rig.bracoE.rotation.x, bEx, k);
+  rig.bracoE.rotation.x = lerp(rig.bracoE.rotation.x, bEx, e.soco > 0 ? 1 : k);
   rig.bracoE.rotation.z = lerp(rig.bracoE.rotation.z, bEz, k);
   rig.bracoD.rotation.x = lerp(rig.bracoD.rotation.x, bDx, e.soco > 0 ? 1 : k);
   rig.bracoD.rotation.z = lerp(rig.bracoD.rotation.z, bDz, k);
@@ -298,6 +302,10 @@ export class Heroi {
     this.olharCamera = false; // vira para onde a câmera olha (laser, pegar)
     this.segurando = null;
     this.soco = 0;
+    this.socoLado = 1;
+    this.atordoado = 0;
+    this.dash = 0;
+    this.raioQuebra = 0;
     this.morto = false;
     this.tempoQuebra = 0;
   }
@@ -326,9 +334,11 @@ export class Heroi {
 
     this.superVelocidade = ctrl.segura('ShiftLeft', 'ShiftRight') && _desejo.lengthSq() > 0;
     const velMax = this.superVelocidade ? 115 : 32;
-    const acel = this.superVelocidade ? 2.5 : 5;
+    let acel = this.superVelocidade ? 2.5 : 5;
+    if (this.atordoado > 0) { this.atordoado -= dt; _desejo.set(0, 0, 0); acel = 0.9; } // levou um golpe forte: voa sem controle
     _v.copy(_desejo).multiplyScalar(velMax);
-    this.vel.lerp(_v, 1 - Math.exp(-acel * dt));
+    if (this.dash > 0) this.dash -= dt; // durante o avanço/investida a velocidade é do combate
+    else this.vel.lerp(_v, 1 - Math.exp(-acel * dt));
 
     this.anterior.copy(this.pos);
     const rapido = this.vel.length() > 12;
@@ -353,11 +363,12 @@ export class Heroi {
     if (rapido) {
       this.centro(_centro);
       _base.copy(this.vel).multiplyScalar(0.7);
-      let n = jogo.predios.danificarEsfera(_centro, 1.3, 9999, { velBase: _base, forca: 10, origem: 'heroi', pedacos: 3 });
+      const rq = this.raioQuebra || 1.3; // na investida o buraco é maior
+      let n = jogo.predios.danificarEsfera(_centro, rq, 9999, { velBase: _base, forca: 10, origem: 'heroi', pedacos: 3 });
       _centro.addScaledVector(this.vel, 0.02);
-      n += jogo.predios.danificarEsfera(_centro, 1.3, 9999, { velBase: _base, forca: 6, origem: 'heroi', pedacos: 2 });
+      n += jogo.predios.danificarEsfera(_centro, rq, 9999, { velBase: _base, forca: 6, origem: 'heroi', pedacos: 2 });
       if (n > 0) {
-        this.vel.multiplyScalar(Math.max(0.8, 1 - n * 0.015));
+        if (!(this.dash > 0)) this.vel.multiplyScalar(Math.max(0.8, 1 - n * 0.015));
         jogo.camera.tremer(0.12 + n * 0.03);
         jogo.efeitos?.poeira(_centro, 3, 2, 5);
         jogo.efeitos?.faiscas(_centro, 4, 10, [0.9, 0.85, 0.7]);
@@ -366,8 +377,8 @@ export class Heroi {
     }
     this.tempoQuebra -= dt;
 
-    // voando rápido por cima de gente/carros: tudo sai voando
-    if (rapido) {
+    // voando rápido por cima de gente/carros: tudo sai voando (no combo/investida quem cuida é o combate)
+    if (rapido && !(this.dash > 0)) {
       this.centro(_centro);
       for (const e of jogo.entidades) {
         if (e === this.segurando || e.remover || e.estado === 'preso' || e.estado === 'arremessado') continue;
@@ -415,7 +426,7 @@ export class Heroi {
     }
     animarHumanoide(rig, {
       dt, voando, rapidez: Math.min(1, vel / 60), inclinacao: incl,
-      andar: noChao && !this.superVelocidade ? horiz : 0, soco: this.soco, segurando: !!this.segurando,
+      andar: noChao && !this.superVelocidade ? horiz : 0, soco: this.soco, socoLado: this.socoLado, segurando: !!this.segurando,
     });
     if (!voando) rig.raiz.position.y += 0;
     else if (vel < 5) rig.raiz.position.y += Math.sin(rig.t * 2) * 0.08; // flutuando

@@ -10,7 +10,7 @@ Abra o endereço que aparecer (normalmente http://localhost:5173) no Chrome ou E
 
 ## Controles
 Mouse olhar · WASD mover/voar · Espaço sobe · Ctrl ou C desce · Shift super velocidade ·
-Botão esquerdo laser · Botão direito segurar = pegar / soltar = arremessar · E soco · Esc solta o mouse
+Botão esquerdo laser · Botão direito segurar = pegar / soltar = arremessar · F combo de socos (avança até o inimigo; o 3º soco arremessa) · Q investida · E soco de impacto · P pausa · Esc solta o mouse
 
 ## O que tem no jogo
 - Cidade com 12 quarteirões: prédios altos (10 a 25 andares), casas, praça com chafariz, posto (as bombas explodem!).

@@ -423,7 +423,11 @@ export class HeroiInimigo extends Entidade {
     this.velAnim = 0;
   }
 
-  lancar(vel, porHeroi) { if (this.variante !== 'gigante') super.lancar(vel, porHeroi); }
+  lancar(vel, porHeroi) {
+    if (this.variante !== 'gigante') { super.lancar(vel, porHeroi); return; }
+    // o gigante só cambaleia para trás
+    if (Number.isFinite(vel.x + vel.z)) { this.pos.x += vel.x * 0.12; this.pos.z += vel.z * 0.12; }
+  }
 
   atualizar(dt) {
     if (this.estado === 'preso') {
@@ -445,6 +449,12 @@ export class HeroiInimigo extends Entidade {
       if (this.estado !== 'normal') this.raio3d?.esconder();
     }
     super.atualizar(dt);
+    // heróis que voam se recuperam no ar depois de arremessados (em vez de cair)
+    if (this.estado === 'arremessado' && this.variante !== 'gigante' && this.tempoEstado > 0.3) {
+      this.vel.multiplyScalar(Math.max(0, 1 - dt * 2.2));
+      this.vel.y += 22 * dt;
+      if (this.vel.length() < 10) { this.estado = 'normal'; this.obj.rotation.set(0, this.obj.rotation.y, 0); this.atordoar(0.4); }
+    }
     if (this.estado === 'normal') this.animar(dt, this.velAnim, this.variante !== 'gigante');
   }
 
@@ -495,11 +505,39 @@ export class HeroiInimigo extends Entidade {
     }
   }
 
+  // soco corpo a corpo de um herói inimigo: manda o herói voando através dos prédios
+  socoNoHeroi(dano, forca) {
+    const jogo = this.jogo;
+    const heroi = jogo.heroi;
+    heroi.centro(_h);
+    this.centro(_c);
+    _d.subVectors(_h, _c).normalize();
+    heroi.levarDano(dano);
+    heroi.vel.copy(_d).multiplyScalar(forca).y += forca * 0.12;
+    heroi.atordoado = 0.45;
+    this.soco = 1;
+    _v.copy(_h).lerp(_c, 0.4);
+    jogo.efeitos.faiscas(_v, 16, 16, [1, 0.95, 0.85]);
+    jogo.efeitos.ondaDeChoque(_v, 7, 0.3, 0xffffff, _d);
+    jogo.camera.tremer(0.55);
+    jogo.camera.socoFov?.(6);
+    jogo.congelar(0.08);
+    jogo.audio?.soco(1);
+  }
+
   iaRaio(dt) {
     const jogo = this.jogo;
     const heroi = jogo.heroi;
     heroi.centro(_h);
     this.timer -= dt;
+    this.esperaSoco = (this.esperaSoco ?? 0) - dt;
+    this.centro(_c);
+    if (this.esperaSoco <= 0 && !heroi.morto && _c.distanceTo(_h) < 6) {
+      // o herói chegou perto: troca socos
+      this.esperaSoco = 1.6;
+      this.socoNoHeroi(22, 75);
+      this.vel.copy(_d).multiplyScalar(-15); // recua um pouco
+    }
     if (this.fase === 'mover') {
       this.angulo += dt * 0.5;
       _v.set(_h.x + Math.cos(this.angulo) * 38, _h.y + 10, _h.z + Math.sin(this.angulo) * 38);
@@ -549,8 +587,10 @@ export class HeroiInimigo extends Entidade {
       this.vel.lerp(_d, Math.min(1, dt * 5));
       if (dist < 2.8 && !heroi.morto) {
         heroi.levarDano(18);
-        _v.copy(_d).normalize().multiplyScalar(45).y += 10;
-        heroi.vel.add(_v);
+        _v.copy(_d).normalize().multiplyScalar(85).y += 8;
+        heroi.vel.copy(_v); // o herói sai voando (e atravessa o que tiver no caminho)
+        heroi.atordoado = 0.5;
+        this.jogo.congelar(0.07);
         this.soco = 1;
         jogo.camera.tremer(0.5);
         jogo.efeitos.ondaDeChoque(_h, 5, 0.3, 0xfff1a0, _v.normalize());
@@ -610,7 +650,11 @@ export class HeroiInimigo extends Entidade {
     this.passo = (this.passo ?? 0) + dt * vel;
     if (this.passo > 6) { this.passo = 0; jogo.tremerPerto(this.pos, 0.25); jogo.efeitos.poeira(this.pos, 3, 3, 5); jogo.audio?.impacto(0.5, this.pos); }
 
-    if (dist < 18 && h.y < 15 && this.timer <= 0 && !heroi.morto) {
+    if (dist < 11 && h.y < 16 && this.timer <= 0 && !heroi.morto && Math.random() < 0.5) {
+      // tapa gigante: o herói vai longe
+      this.timer = 2.4;
+      this.socoNoHeroi(40, 110);
+    } else if (dist < 18 && h.y < 15 && this.timer <= 0 && !heroi.morto) {
       // pisão: onda de choque
       this.timer = 3;
       _c.copy(this.pos).y = 0.5;
@@ -621,8 +665,9 @@ export class HeroiInimigo extends Entidade {
       jogo.predios.danificarEsfera(_c, 9, 300, { forca: 12, origem: 'inimigo', pedacos: 1 });
       const f = 1 - Math.min(1, dist / 20);
       heroi.levarDano(55 * f + 10);
-      _v.set(dx / dist, 0.6, dz / dist).multiplyScalar(50 * f + 15);
-      heroi.vel.add(_v);
+      _v.set(dx / dist, 0.6, dz / dist).multiplyScalar(70 * f + 20);
+      heroi.vel.copy(_v);
+      heroi.atordoado = 0.4;
     } else if (dist >= 18 && this.timer2 <= 0 && !heroi.morto) {
       // arremessa uma pedra
       this.timer2 = 4 + Math.random() * 2;

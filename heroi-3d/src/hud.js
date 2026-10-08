@@ -78,6 +78,18 @@ export class Hud {
     this.set('dano', Math.round(Math.max(this.alphaDano, baixa) * 50), (v) => (this.dano.style.opacity = v / 50));
   }
 
+  combo(n) {
+    if (!this.elCombo) {
+      this.elCombo = document.createElement('div');
+      this.elCombo.id = 'combo';
+      document.getElementById('hud').appendChild(this.elCombo);
+    }
+    this.elCombo.textContent = n >= 2 ? `COMBO x${n}` : '';
+    this.elCombo.classList.remove('pulo');
+    void this.elCombo.offsetWidth; // reinicia a animação
+    if (n >= 2) this.elCombo.classList.add('pulo');
+  }
+
   piscarDano(f) { this.alphaDano = Math.min(1, this.alphaDano + 0.25 + f * 0.6); }
 
   mensagem(texto, cor = '#fff') {

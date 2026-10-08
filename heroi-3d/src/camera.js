@@ -31,6 +31,9 @@ export class CameraHeroi {
     this.direita.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
   }
 
+  // "soco" na lente: o campo de visão abre e volta (sensação de impacto)
+  socoFov(graus) { this.fovExtra = Math.min(18, (this.fovExtra || 0) + graus); }
+
   tremer(qtd) { if (Number.isFinite(qtd)) this.trauma = Math.min(0.85, this.trauma + Math.min(0.5, qtd)); }
 
   atualizar(dt, heroi, predios) {
@@ -77,6 +80,7 @@ export class CameraHeroi {
 
     const fovAlvo = 72 + rapidez * 20;
     cam.fov += (fovAlvo - cam.fov) * Math.min(1, dt * 3);
+    if (this.fovExtra > 0.01) { cam.fov += this.fovExtra * Math.min(1, dt * 12); this.fovExtra *= Math.max(0, 1 - dt * 8); }
     cam.updateProjectionMatrix();
   }
 }
