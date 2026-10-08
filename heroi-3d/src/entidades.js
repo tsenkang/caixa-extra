@@ -128,6 +128,11 @@ export class Entidade {
       // prédios
       if (jogo.predios.solido(_c.x, _c.y, _c.z)) {
         this.impacto(v);
+        if (v > 32 && (this.estado === 'arremessado' || this.voandoMorto)) {
+          // rápido demais: atravessa a parede e continua voando
+          this.vel.multiplyScalar(0.72);
+          continue;
+        }
         this.vel.multiplyScalar(-0.15);
         if (this.estado !== 'arremessado' && !this.voandoMorto) return;
         this.pos.addScaledVector(this.vel, h * 2);
@@ -172,8 +177,9 @@ export class Entidade {
     this.centro(_c);
     const forca = v * this.massa;
     const origem = this.lancadoPorHeroi ? 'heroi' : 'inimigo';
-    _v.copy(this.vel).multiplyScalar(0.35);
-    jogo.predios.danificarEsfera(_c, 1.2 + Math.min(4, this.massa * 0.7), forca * 4, { velBase: _v, forca: 7, origem, pedacos: 2 });
+    _v.copy(this.vel).multiplyScalar(0.6);
+    jogo.predios.danificarEsfera(_c, 1.6 + Math.min(4, this.massa * 0.7), forca * 4, { velBase: _v, forca: 12, origem, pedacos: 3 });
+    if (forca > 120) jogo.congelar(0.04);
     jogo.efeitos?.poeira(_c, 4 + Math.min(10, this.massa * 2), 2, 4);
     jogo.efeitos?.faiscas(_c, 8, 12);
     jogo.tremerPerto(_c, Math.min(0.6, forca / 300));

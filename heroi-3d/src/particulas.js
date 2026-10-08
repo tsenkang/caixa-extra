@@ -34,7 +34,7 @@ void main() {
   float n = smoothstep(uNevoaPerto, uNevoaLonge, vDist);
   vec3 cor = mix(vCor, uNevoaCor, n * (1.0 - uAditivo));
   a *= 1.0 - n * uAditivo;
-  gl_FragColor = vec4(cor, a);
+  gl_FragColor = vec4(cor * (1.0 + uAditivo * 5.0), a);
 }`;
 
 export class SistemaParticulas {

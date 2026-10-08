@@ -139,6 +139,7 @@ export class SistemaDetritos {
         this.vel[s3] += dx * f; this.vel[s3 + 1] += dy * f + forca * 0.3; this.vel[s3 + 2] += dz * f;
         this.ang[s3] = (Math.random() - 0.5) * 6; this.ang[s3 + 2] = (Math.random() - 0.5) * 6;
         this.dormindo[s] = 0;
+        this.tempoParado[s] = 0;
       }
     }
   }
@@ -164,6 +165,7 @@ export class SistemaDetritos {
             this.vel[s3] = this.vel[s3 + 1] = this.vel[s3 + 2] = 0;
             this.tirarCorpo(s);
             this.dormindo[s] = 1;
+            this.tempoParado[s] = 0;
           }
           continue;
         }
@@ -172,7 +174,22 @@ export class SistemaDetritos {
         _q.set(corpo.quaternion.x, corpo.quaternion.y, corpo.quaternion.z, corpo.quaternion.w);
         if (_p.y < -5) { this.liberar(s); this.numAtivos--; continue; }
       } else {
-        if (this.dormindo[s]) continue;
+        if (this.dormindo[s]) {
+          // entulho parado some depois de um tempo (encolhendo)
+          this.tempoParado[s] += dt;
+          const t = this.tempoParado[s];
+          if (t > 35) {
+            const k = Math.max(0, 1 - (t - 35));
+            if (k <= 0) { this.liberar(s); this.numAtivos--; mudou = true; continue; }
+            _p.set(this.pos[s3], this.pos[s3 + 1] - (1 - k) * 0.5, this.pos[s3 + 2]);
+            _q.set(this.rot[s4], this.rot[s4 + 1], this.rot[s4 + 2], this.rot[s4 + 3]);
+            _s.set(this.tam[s3] * k, this.tam[s3 + 1] * k, this.tam[s3 + 2] * k);
+            _m.compose(_p, _q, _s);
+            _m.toArray(arr, s * 16);
+            mudou = true;
+          }
+          continue;
+        }
         // física simples
         let vx = this.vel[s3], vy = this.vel[s3 + 1] - GRAVIDADE * dt, vz = this.vel[s3 + 2];
         let x = this.pos[s3] + vx * dt, y = this.pos[s3 + 1] + vy * dt, z = this.pos[s3 + 2] + vz * dt;
@@ -196,7 +213,7 @@ export class SistemaDetritos {
           vy = -vy * 0.2;
           vx *= 0.55; vz *= 0.55;
           this.ang[s3] *= 0.5; this.ang[s3 + 1] *= 0.5; this.ang[s3 + 2] *= 0.5;
-          if (vx * vx + vy * vy + vz * vz < 1.5) { vx = vy = vz = 0; this.dormindo[s] = 1; }
+          if (vx * vx + vy * vy + vz * vz < 1.5) { vx = vy = vz = 0; this.dormindo[s] = 1; this.tempoParado[s] = 0; }
         }
         this.pos[s3] = x; this.pos[s3 + 1] = y; this.pos[s3 + 2] = z;
         this.vel[s3] = vx; this.vel[s3 + 1] = vy; this.vel[s3 + 2] = vz;

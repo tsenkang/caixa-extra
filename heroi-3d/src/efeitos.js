@@ -12,6 +12,8 @@ export class Raio {
     const geo = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
     this.miolo = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: corMiolo, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.brilho = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: corBrilho, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.miolo.material.color.multiplyScalar(8);
+    this.brilho.material.color.multiplyScalar(5);
     this.larguraMiolo = larguraMiolo;
     this.larguraBrilho = larguraBrilho;
     this.miolo.visible = this.brilho.visible = false;
@@ -97,6 +99,18 @@ export class Efeitos {
       });
     }
   }
+  // lascas: pedacinhos da cor do bloco que voam e caem
+  lascas(p, qtd, vel, cor) {
+    for (let i = 0; i < qtd; i++) {
+      const k = 0.6 + Math.random();
+      const c = 0.7 + Math.random() * 0.3;
+      this.normal.emitir(p.x + (Math.random() - 0.5) * 2, p.y + (Math.random() - 0.5) * 2, p.z + (Math.random() - 0.5) * 2, {
+        vx: vel.x * k + (Math.random() - 0.5) * 12, vy: vel.y * k + Math.random() * 9, vz: vel.z * k + (Math.random() - 0.5) * 12,
+        vida: 1 + Math.random() * 1.2, tamIni: 0.25 + Math.random() * 0.35, tamFim: 0.2, alfa: 1.6,
+        gravidade: 22, arrasto: 0.3, r: cor.r * c, g: cor.g * c, b: cor.b * c,
+      });
+    }
+  }
   fumaca(p, qtd = 3, tamanho = 4, escura = 0.25) {
     for (let i = 0; i < qtd; i++) {
       const c = escura + Math.random() * 0.12;
@@ -166,7 +180,7 @@ export class Efeitos {
       if (t >= 1) { b.m.visible = false; continue; }
       b.m.scale.setScalar(b.raio * (0.3 + Math.sqrt(t) * 0.9));
       b.m.material.opacity = 1 - t;
-      b.m.material.color.setRGB(1, 0.75 - t * 0.5, 0.35 - t * 0.3);
+      b.m.material.color.setRGB(6, 4.5 - t * 3, 2 - t * 1.8);
     }
     for (const o of this.ondas) {
       if (!o.m.visible) continue;
@@ -174,7 +188,7 @@ export class Efeitos {
       const t = o.t / o.dur;
       if (t >= 1) { o.m.visible = false; continue; }
       o.m.scale.setScalar(o.raio * (0.15 + t));
-      o.m.material.opacity = (1 - t) * 0.9;
+      o.m.material.opacity = (1 - t) * 0.55;
     }
     for (const l of this.luzes) {
       if (l.forca <= 0) { l.l.intensity = 0; continue; }

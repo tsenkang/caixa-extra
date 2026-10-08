@@ -10,7 +10,13 @@ import { Heroi } from './heroi.js';
 import { Populacao } from './entidades.js';
 import { Mira, Laser, Soco, Agarrar } from './poderes.js';
 import { Hud } from './hud.js';
-import { Projeteis, Alerta } from './inimigos.js';
+import { Audio } from './audio.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import * as Inimigos from './inimigos.js';
+const { Projeteis, Alerta } = Inimigos;
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Vector3();
@@ -24,7 +30,7 @@ class Jogo {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.75;
+    this.renderer.toneMappingExposure = 0.95;
 
     this.cena = new THREE.Scene();
     this.cam3 = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 3000);
@@ -55,11 +61,20 @@ class Jogo {
     this.alerta = new Alerta(this);
     this.controles.aoPerderTrava = () => { if (!this.acabou && !this.pausado) this.pausar(); };
 
+    // brilho (bloom) no laser, explosões e faíscas
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.cena, this.cam3));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.45, 4.0);
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
+    this.usarBloom = true;
+
     this.relogio = new THREE.Clock();
     this.fps = { quadros: 0, tempo: 0, el: document.getElementById('fps') };
 
     addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
+      this.composer.setSize(innerWidth, innerHeight);
       this.cam3.aspect = innerWidth / innerHeight;
       this.cam3.updateProjectionMatrix();
     });
@@ -79,6 +94,7 @@ class Jogo {
     this.marcarPerigo(centro, 50);
     this.audio?.desabamento(Math.min(1, qtd / 200), centro);
   }
+  congelar(t) { this.congelado = Math.max(this.congelado || 0, t); }
   tremerPerto(pos, qtd) {
     const d = pos.distanceTo(this.heroi.pos);
     const f = Math.max(0, 1 - d / 120);
@@ -95,9 +111,10 @@ class Jogo {
   // explosão: efeitos + dano em prédios, entidades e no herói
   explosao(pos, raio, dano, origem = 'heroi', fonte = null) {
     this.efeitos.explosao(pos, raio);
+    this.audio?.explosao(raio / 8, pos);
     this.tremerPerto(pos, Math.min(1, raio / 10));
     this.marcarPerigo(pos, raio * 4);
-    this.predios.danificarEsfera(pos, raio * 0.8, dano * 3, { forca: 10 + raio, origem, pedacos: 2 });
+    this.predios.danificarEsfera(pos, raio * 0.8, dano * 3, { forca: 16 + raio * 1.5, origem, pedacos: 3 });
     this.detritos.empurrar(pos, raio * 2, 12 + raio);
     for (const e of this.entidades) {
       if (e === fonte || e.remover || e.estado === 'preso') continue;
@@ -117,7 +134,9 @@ class Jogo {
 
   // ---------- loop ----------
   quadro() {
-    const dt = Math.min(0.05, this.relogio.getDelta());
+    let dt = Math.min(0.05, this.relogio.getDelta());
+    // "congelamento" rápido nos impactos fortes (dá peso ao golpe)
+    if (this.congelado > 0) { this.congelado -= dt; dt *= 0.08; }
     if (!this.pausado) this.atualizar(dt);
     if (this.pausado) this.camera.atualizar(0, this.heroi, this.predios);
     this.efeitos.desenharVento(dt, this.heroi.superVelocidade && !this.pausado ? Math.min(1, this.heroi.vel.length() / 100) : 0);
@@ -126,7 +145,8 @@ class Jogo {
     const h = this.heroi.pos;
     this.sol.target.position.set(Math.round(h.x), 0, Math.round(h.z));
     this.sol.position.copy(this.dirSol).multiplyScalar(300).add(this.sol.target.position);
-    this.renderer.render(this.cena, this.cam3);
+    if (this.usarBloom) this.composer.render();
+    else this.renderer.render(this.cena, this.cam3);
     this.contarFps(dt);
   }
 
@@ -156,6 +176,7 @@ class Jogo {
     this.efeitos.atualizar(dt, this.cam3, this.renderer.domElement.clientHeight);
     this.alertaMax = Math.max(this.alertaMax || 0, this.alerta.nivel);
     this.hud.atualizar(dt);
+    this.audio?.atualizar(this.heroi.vel.length());
     ctrl.limpar();
   }
 
@@ -174,9 +195,11 @@ class Jogo {
     this.pausado = true;
     this.audio?.laser(false);
     document.getElementById('pausa').classList.remove('escondido');
+    this.audio?.ctx.suspend();
   }
   continuar() {
     document.getElementById('pausa').classList.add('escondido');
+    this.audio?.ctx.resume();
     this.pausado = false;
     this.relogio.getDelta();
     this.controles.travar();
@@ -196,6 +219,7 @@ class Jogo {
   comecar() {
     // opções do menu
     const sombras = document.getElementById('op-sombras').checked;
+    this.usarBloom = document.getElementById('op-bloom').checked;
     this.renderer.shadowMap.enabled = sombras;
     this.sol.castShadow = sombras;
     this.cena.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
@@ -203,6 +227,7 @@ class Jogo {
       // em tela cheia o navegador deixa o jogo usar Ctrl+W sem fechar a aba
       document.documentElement.requestFullscreen?.().then(() => navigator.keyboard?.lock?.()).catch(() => {});
     }
+    try { this.audio = this.audio || Audio.protegido(new Audio(this)); this.audio.ctx.resume(); } catch { this.audio = null; }
     document.getElementById('menu').classList.add('escondido');
     document.getElementById('hud').classList.remove('escondido');
     this.pausado = false;
@@ -212,6 +237,7 @@ class Jogo {
 
 const jogo = new Jogo();
 window.jogo = jogo; // ajuda nos testes pelo console
+window.Inimigos = Inimigos;
 const btn = document.getElementById('btn-jogar');
 document.getElementById('carregando').textContent = '';
 btn.addEventListener('click', () => jogo.comecar());

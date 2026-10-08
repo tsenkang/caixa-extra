@@ -272,19 +272,22 @@ export class SistemaPredios {
       } else {
         const bx = vel.x, by = vel.y, bz = vel.z; // vel pode ser o mesmo vetor _vel
         for (let n = 0; n < pedacos; n++) {
-          const e = 0.4 + Math.random() * 0.25;
-          _tam.set(p.tx * e, p.ty * (0.35 + Math.random() * 0.3), p.tz * e);
+          const e = 0.28 + Math.random() * 0.3;
+          _tam.set(p.tx * e, p.ty * (0.22 + Math.random() * 0.35), p.tz * (0.28 + Math.random() * 0.3));
           const pos = _s.set(
             _p.x + (Math.random() - 0.5) * p.tx * 0.5,
             _p.y + (Math.random() - 0.5) * p.ty * 0.5,
             _p.z + (Math.random() - 0.5) * p.tz * 0.5);
           _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(8);
-          const vx = bx + (Math.random() - 0.5) * 4, vy = by + Math.random() * 3, vz = bz + (Math.random() - 0.5) * 4;
+          const k = 0.75 + Math.random() * 0.6;
+          const vx = bx * k + (Math.random() - 0.5) * 7, vy = by * k + Math.random() * 5, vz = bz * k + (Math.random() - 0.5) * 7;
           det.criar(pos, _tam, _c, _vel.set(vx, vy, vz), _ang);
         }
       }
     }
-    if (Math.random() < 0.35) this.jogo.efeitos?.poeira(_p, 2, 1.5, 3);
+    // lascas pequenas (só partículas, sem física) + poeira
+    this.jogo.efeitos?.lascas(_p, 6, vel, _c);
+    if (Math.random() < 0.5) this.jogo.efeitos?.poeira(_p, 2, 1.5, 3.5);
   }
 
   checarDestruido(p) {
@@ -356,10 +359,22 @@ export class SistemaPredios {
         this.esconder(p, idx);
         this.centroCelula(p, idx, _p);
         _c.setRGB(p.cores[idx * 3], p.cores[idx * 3 + 1], p.cores[idx * 3 + 2]);
-        _vel.set((Math.random() - 0.5) * 2, -1 - Math.random() * 2, (Math.random() - 0.5) * 2);
-        _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(1.5);
-        _tam.set(p.tx * 0.96, p.ty * 0.96, p.tz * 0.96);
-        det?.criar(_p, _tam, _c, _vel, _ang);
+        // empurra um pouco para fora do centro do prédio: ele "se desfaz" ao cair
+        const ox = _p.x - (p.x0 + p.x1) / 2, oz = _p.z - (p.z0 + p.z1) / 2;
+        _vel.set(ox * 0.25 + (Math.random() - 0.5) * 3, -1 - Math.random() * 3, oz * 0.25 + (Math.random() - 0.5) * 3);
+        _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(3);
+        if (a % 2 === 0) {
+          _tam.set(p.tx * 0.95, p.ty * 0.95, p.tz * 0.95);
+          det?.criar(_p, _tam, _c, _vel, _ang);
+        } else {
+          // metade dos blocos já cai partida em dois
+          _tam.set(p.tx * 0.95, p.ty * 0.47, p.tz * 0.95);
+          _s.copy(_p); _s.y += p.ty * 0.25;
+          det?.criar(_s, _tam, _c, _vel, _ang);
+          _s.y -= p.ty * 0.5;
+          _ang.multiplyScalar(-1);
+          det?.criar(_s, _tam, _c, _vel, _ang);
+        }
         if (a % 10 === 0) this.jogo.efeitos?.poeira(_p, 1, 2, 5);
       }
       this.filaQueda.splice(0, n * 2);

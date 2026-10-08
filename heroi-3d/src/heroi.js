@@ -260,8 +260,8 @@ export class Heroi {
     // ---------- atravessar prédios (abre um buraco do tamanho do corpo) ----------
     if (rapido) {
       this.centro(_centro);
-      _base.copy(this.vel).multiplyScalar(0.45);
-      let n = jogo.predios.danificarEsfera(_centro, 1.3, 9999, { velBase: _base, forca: 6, origem: 'heroi', pedacos: 2 });
+      _base.copy(this.vel).multiplyScalar(0.7);
+      let n = jogo.predios.danificarEsfera(_centro, 1.3, 9999, { velBase: _base, forca: 10, origem: 'heroi', pedacos: 3 });
       _centro.addScaledVector(this.vel, 0.02);
       n += jogo.predios.danificarEsfera(_centro, 1.3, 9999, { velBase: _base, forca: 6, origem: 'heroi', pedacos: 2 });
       if (n > 0) {

@@ -118,7 +118,7 @@ export class Laser {
       mira.entidade.levarDano(170 * dt, 'heroi');
     } else if (mira.tipo === 'predio') {
       _vel.copy(mira.normal).multiplyScalar(5);
-      jogo.predios.danificarEsfera(ponto, 1.8, 110 * dt, { velBase: _vel, forca: 4, origem: 'heroi', pedacos: 3 });
+      jogo.predios.danificarEsfera(ponto, 1.8, 110 * dt, { velBase: _vel, forca: 6, origem: 'heroi', pedacos: 4 });
     }
     if (mira.tipo !== 'ceu') {
       // respingo de dano em volta
@@ -158,15 +158,30 @@ export class Soco {
     const parede = jogo.predios.raycast(_c, frente, 8);
     const pertoDoChao = heroi.pos.y < 3;
 
+    const alvo = jogo.mira.tipo === 'entidade' && jogo.mira.dist < 14 ? jogo.mira.entidade : null;
+    if (alvo) {
+      // soco direto: o alvo sai voando e atravessa prédios
+      alvo.levarDano(60, 'heroi');
+      _vel.copy(frente).multiplyScalar(95 / Math.sqrt(alvo.massa)).y += 6;
+      alvo.lancar(_vel, true);
+      alvo.centro(_o);
+      jogo.efeitos.ondaDeChoque(_o, 7, 0.3, 0xffffff, frente);
+      jogo.efeitos.faiscas(_o, 14, 16, [1, 0.95, 0.8]);
+      jogo.camera.tremer(0.45);
+      jogo.congelar(0.09);
+      jogo.audio?.soco(1);
+      return;
+    }
     if (parede || !pertoDoChao) {
       // soco para frente: abre um rombo no prédio
       const ponto = parede ? _o.copy(parede.ponto) : _o.copy(_c).addScaledVector(frente, 3);
-      _vel.copy(frente).multiplyScalar(22);
-      jogo.predios.danificarEsfera(ponto, 5.5, 500, { velBase: _vel, forca: 10, origem: 'heroi', pedacos: 2 });
+      _vel.copy(frente).multiplyScalar(38);
+      jogo.predios.danificarEsfera(ponto, 5.5, 500, { velBase: _vel, forca: 18, origem: 'heroi', pedacos: 4 });
       _v.copy(ponto).addScaledVector(frente, 5);
-      jogo.predios.danificarEsfera(_v, 4.5, 300, { velBase: _vel, forca: 8, origem: 'heroi', pedacos: 1 });
+      jogo.predios.danificarEsfera(_v, 4.5, 300, { velBase: _vel, forca: 14, origem: 'heroi', pedacos: 2 });
+      jogo.congelar(0.07);
       jogo.detritos.empurrar(ponto, 12, 18);
-      this.empurrarEntidades(ponto, 11, frente, 35, 45);
+      this.empurrarEntidades(ponto, 11, frente, 70, 45);
       jogo.efeitos.ondaDeChoque(ponto, 10, 0.35, 0xffffff, frente);
       jogo.efeitos.poeira(ponto, 10, 4, 7);
       jogo.efeitos.faiscas(ponto, 15, 16, [1, 0.9, 0.7]);
@@ -177,9 +192,10 @@ export class Soco {
       // soco no chão: onda de choque em volta
       _o.copy(heroi.pos);
       _v.copy(_o).y = 1;
-      jogo.predios.danificarEsfera(_v, 10, 280, { forca: 14, origem: 'heroi', pedacos: 2 });
+      jogo.predios.danificarEsfera(_v, 10, 280, { forca: 24, origem: 'heroi', pedacos: 3 });
+      jogo.congelar(0.08);
       jogo.detritos.empurrar(_o, 22, 20);
-      this.empurrarEntidades(_o, 18, null, 30, 55);
+      this.empurrarEntidades(_o, 18, null, 45, 55);
       jogo.efeitos.ondaDeChoque(_v.set(_o.x, 0.4, _o.z), 20, 0.5);
       jogo.efeitos.ondaDeChoque(_v.set(_o.x, 0.6, _o.z), 12, 0.35, 0xffd9a0);
       for (let i = 0; i < 28; i++) {

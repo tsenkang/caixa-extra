@@ -26,24 +26,37 @@ function finalizar(c) {
 
 // uma face de bloco com uma janela (o bloco tem 1 andar)
 export function texturaJanela() {
-  const t = 64;
+  const t = 128;
   const [c, ctx] = canvas(t);
-  ctx.fillStyle = '#f2f2f2';
+  ctx.fillStyle = '#f4f2ee';
   ctx.fillRect(0, 0, t, t);
-  ruido(ctx, t, 18);
-  ctx.fillStyle = '#d0d0d0';
-  ctx.fillRect(0, t - 6, t, 6); // laje
-  // vidro
-  const g = ctx.createLinearGradient(0, 14, 0, 46);
-  g.addColorStop(0, '#5d7ea8');
-  g.addColorStop(1, '#22344d');
+  ruido(ctx, t, 14);
+  // laje entre andares e frisos
+  ctx.fillStyle = '#c9c5bd';
+  ctx.fillRect(0, t - 12, t, 12);
+  ctx.fillStyle = 'rgba(0,0,0,0.10)';
+  ctx.fillRect(0, t - 13, t, 1);
+  ctx.fillRect(0, 0, 2, t);
+  ctx.fillRect(t - 2, 0, 2, t);
+  // moldura
+  ctx.fillStyle = '#8d8a85';
+  ctx.fillRect(20, 22, 88, 72);
+  // vidro refletindo o céu
+  const g = ctx.createLinearGradient(0, 26, 0, 90);
+  g.addColorStop(0, '#bfe0f5');
+  g.addColorStop(0.45, '#6c9cc4');
+  g.addColorStop(1, '#2b4a6b');
   ctx.fillStyle = g;
-  ctx.fillRect(12, 14, 40, 32);
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.beginPath(); ctx.moveTo(14, 44); ctx.lineTo(30, 16); ctx.lineTo(36, 16); ctx.lineTo(20, 44); ctx.fill();
-  ctx.fillStyle = '#9a9a9a';
-  ctx.fillRect(31, 14, 2, 32);
-  ctx.fillRect(10, 46, 44, 3);
+  ctx.fillRect(24, 26, 80, 64);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath(); ctx.moveTo(28, 86); ctx.lineTo(60, 28); ctx.lineTo(74, 28); ctx.lineTo(42, 86); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.moveTo(52, 86); ctx.lineTo(84, 28); ctx.lineTo(90, 28); ctx.lineTo(58, 86); ctx.fill();
+  ctx.fillStyle = '#8d8a85';
+  ctx.fillRect(62, 26, 4, 64);
+  // peitoril
+  ctx.fillStyle = '#b5b1aa';
+  ctx.fillRect(16, 94, 96, 6);
   return finalizar(c);
 }
 
