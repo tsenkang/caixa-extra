@@ -68,6 +68,23 @@ export function membro(r1, r2, cor, x1, y1, z1, x2, y2, z2, seg = 8) {
   return parte(g, cor, m.x, m.y, m.z, e.x, e.y, e.z);
 }
 
+// perfil lateral (pontos [z, y]) extrudado na largura (eixo x), centrado em x
+export function perfil(pts, largura, cor, x = 0, y = 0, z = 0, chanfro = 0.05) {
+  const sh = new THREE.Shape();
+  sh.moveTo(pts[0][0], pts[0][1]);
+  for (const [pz, py] of pts.slice(1)) sh.lineTo(pz, py);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: largura, bevelEnabled: chanfro > 0, bevelThickness: chanfro, bevelSize: chanfro, bevelSegments: 1 });
+  g.rotateY(-Math.PI / 2);
+  g.translate(largura / 2, 0, 0);
+  return parte(g, cor, x, y, z);
+}
+// roda com pneu, calota e aro
+function roda(partes, x, y, z, r, larg, corCalota = 0xb8bcc2) {
+  partes.push(cilindro(r, r, larg, 0x141414, x, y, z, 0, 0, Math.PI / 2, 16));
+  partes.push(cilindro(r * 0.58, r * 0.58, larg + 0.02, corCalota, x, y, z, 0, 0, Math.PI / 2, 12));
+  partes.push(cilindro(r * 0.2, r * 0.2, larg + 0.05, 0x333333, x, y, z, 0, 0, Math.PI / 2, 8));
+}
+
 // junta várias partes coloridas em uma geometria só
 export function juntar(partes) {
   const geos = [];
@@ -168,95 +185,163 @@ export function geoSoldado() {
 }
 
 // ---------- Veículos (frente = +z) ----------
-// carro: perfil lateral (capô, para-brisa, teto, porta-malas) extrudado na largura
-export function geoCarro(cor) {
-  return emCache(`carro${cor}`, () => {
-    const perfil = new THREE.Shape();
-    const pts = [[-2.15, 0.35], [-2.2, 0.85], [-1.6, 0.95], [-1.1, 1.55], [0.55, 1.58], [1.2, 1.0], [2.1, 0.88], [2.2, 0.35]];
-    perfil.moveTo(pts[0][0], pts[0][1]);
-    for (const [z, y] of pts.slice(1)) perfil.lineTo(z, y);
-    const larg = 1.8;
-    const corpo = new THREE.ExtrudeGeometry(perfil, { depth: larg, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 1 });
-    // extrusão sai no plano XY e cresce em Z: gira para o perfil ficar em ZY e a largura em X
-    corpo.rotateY(-Math.PI / 2);
-    corpo.translate(larg / 2, 0, 0);
-    const vidros = new THREE.Shape();
-    vidros.moveTo(-1.45, 1.0); vidros.lineTo(-1.02, 1.5); vidros.lineTo(0.5, 1.52); vidros.lineTo(1.05, 1.02);
-    const janela = new THREE.ExtrudeGeometry(vidros, { depth: larg + 0.16, bevelEnabled: false });
-    janela.rotateY(-Math.PI / 2);
-    janela.translate((larg + 0.16) / 2, 0, 0);
-    const partes = [
-      parte(corpo, cor),
-      parte(janela, 0x22344a),
-      caixa(1.9, 0.18, 0.25, 0x2a2a2a, 0, 0.42, 2.2), caixa(1.9, 0.18, 0.25, 0x2a2a2a, 0, 0.42, -2.2), // para-choques
-      caixa(0.42, 0.14, 0.06, 0xfff4c8, -0.6, 0.78, 2.24), caixa(0.42, 0.14, 0.06, 0xfff4c8, 0.6, 0.78, 2.24),
-      caixa(0.42, 0.12, 0.06, 0xd01818, -0.6, 0.78, -2.24), caixa(0.42, 0.12, 0.06, 0xd01818, 0.6, 0.78, -2.24),
-      caixa(0.6, 0.12, 0.05, 0x1a1a1a, 0, 0.6, 2.24), // grade
-    ];
-    for (const sx of [-0.92, 0.92]) for (const sz of [-1.35, 1.4]) {
-      partes.push(cilindro(0.36, 0.36, 0.26, 0x151515, sx, 0.36, sz, 0, 0, Math.PI / 2, 14));
-      partes.push(cilindro(0.2, 0.2, 0.28, 0xc0c4c8, sx, 0.36, sz, 0, 0, Math.PI / 2, 10)); // calota
+// veículos civis: sedã, SUV, picape, táxi, viatura de polícia e ônibus (perfil lateral extrudado)
+export const TIPOS_CARRO = {
+  sedan: { raio: 2.2, altura: 1.6, massa: 3, vida: 60, vel: 1 },
+  suv: { raio: 2.3, altura: 1.9, massa: 3.5, vida: 75, vel: 1 },
+  picape: { raio: 2.5, altura: 1.9, massa: 3.5, vida: 75, vel: 1 },
+  taxi: { raio: 2.2, altura: 1.7, massa: 3, vida: 60, vel: 1.1 },
+  policia: { raio: 2.2, altura: 1.7, massa: 3, vida: 70, vel: 1.3 },
+  onibus: { raio: 5.6, altura: 3.2, massa: 9, vida: 160, vel: 0.7 },
+};
+
+export function geoCarro(cor, tipo = 'sedan') {
+  return emCache(`carro${cor}-${tipo}`, () => {
+    const vidro = 0x22344a, escuro = 0x2a2a2a;
+    const p = [];
+    let comp = 2.2, larg = 1.8, rRoda = 0.36, eixos = [-1.35, 1.4];
+    if (tipo === 'sedan' || tipo === 'taxi' || tipo === 'policia') {
+      const corCorpo = tipo === 'taxi' ? 0xf5c518 : tipo === 'policia' ? 0x1b1f2a : cor;
+      p.push(perfil([[-2.15, 0.35], [-2.2, 0.85], [-1.6, 0.95], [-1.1, 1.55], [0.55, 1.58], [1.2, 1.0], [2.1, 0.88], [2.2, 0.35]], larg, corCorpo));
+      p.push(perfil([[-1.45, 1.0], [-1.02, 1.5], [0.5, 1.52], [1.05, 1.02]], larg + 0.16, vidro, 0, 0, 0, 0));
+      if (tipo === 'policia') {
+        p.push(caixa(larg + 0.14, 0.42, 1.9, 0xf2f2f2, 0, 0.62, -0.15)); // portas brancas
+        p.push(caixa(1.1, 0.14, 0.32, 0x222222, 0, 1.66, -0.3)); // base do giroflex
+      }
+      if (tipo === 'taxi') {
+        p.push(caixa(0.7, 0.22, 0.32, 0xffffff, 0, 1.7, -0.3)); // placa TÁXI
+        for (let i = 0; i < 8; i++) p.push(caixa(larg + 0.13, 0.1, 0.22, i % 2 ? 0x111111 : 0xffffff, 0, 0.7, -1.4 + i * 0.4)); // faixa xadrez
+      }
+    } else if (tipo === 'suv') {
+      comp = 2.3; rRoda = 0.42; eixos = [-1.45, 1.45];
+      p.push(perfil([[-2.25, 0.42], [-2.3, 1.7], [-2.0, 1.85], [0.85, 1.86], [1.45, 1.2], [2.25, 1.05], [2.3, 0.42]], larg + 0.1, cor));
+      p.push(perfil([[-2.05, 1.2], [-1.95, 1.75], [0.8, 1.76], [1.3, 1.22]], larg + 0.26, vidro, 0, 0, 0, 0));
+      p.push(caixa(1.5, 0.06, 2.2, escuro, -0.0, 1.95, -0.6)); // bagageiro
+    } else if (tipo === 'picape') {
+      comp = 2.5; rRoda = 0.42; eixos = [-1.6, 1.5];
+      p.push(perfil([[-2.6, 0.45], [-2.6, 1.15], [-0.35, 1.15], [-0.35, 1.85], [0.85, 1.86], [1.4, 1.2], [2.4, 1.05], [2.45, 0.45]], larg + 0.1, cor));
+      p.push(perfil([[-0.25, 1.2], [-0.25, 1.75], [0.8, 1.76], [1.3, 1.22]], larg + 0.26, vidro, 0, 0, 0, 0));
+      p.push(caixa(larg - 0.1, 0.1, 2.1, 0x2b2b2b, 0, 1.12, -1.45)); // caçamba
+    } else if (tipo === 'onibus') {
+      comp = 5.6; larg = 2.5; rRoda = 0.55; eixos = [-3.6, 3.4];
+      p.push(perfil([[-5.6, 0.5], [-5.6, 3.1], [5.3, 3.1], [5.65, 2.6], [5.65, 0.5]], larg, cor));
+      p.push(perfil([[-5.3, 1.6], [-5.3, 2.7], [5.2, 2.7], [5.45, 2.4], [5.45, 1.6]], larg + 0.08, vidro, 0, 0, 0, 0));
+      p.push(caixa(larg + 0.1, 0.25, 11.2, 0xf2f2f2, 0, 1.3, 0)); // faixa
+      p.push(caixa(0.9, 0.35, 0.06, 0x111111, 0, 2.85, 5.68)); // letreiro
+      p.push(caixa(0.8, 0.12, 0.05, 0xffb000, 0, 2.85, 5.72));
     }
-    return juntar(partes);
+    const fz = comp + 0.04;
+    p.push(caixa(larg + 0.1, 0.18, 0.25, escuro, 0, 0.45, comp), caixa(larg + 0.1, 0.18, 0.25, escuro, 0, 0.45, -comp)); // para-choques
+    p.push(caixa(0.42, 0.14, 0.06, 0xfff4c8, -larg * 0.33, 0.8, fz), caixa(0.42, 0.14, 0.06, 0xfff4c8, larg * 0.33, 0.8, fz)); // faróis
+    p.push(caixa(0.42, 0.12, 0.06, 0xd01818, -larg * 0.33, 0.8, -fz), caixa(0.42, 0.12, 0.06, 0xd01818, larg * 0.33, 0.8, -fz)); // lanternas
+    p.push(caixa(0.18, 0.12, 0.25, escuro, -larg / 2 - 0.12, 1.15, 0.9), caixa(0.18, 0.12, 0.25, escuro, larg / 2 + 0.12, 1.15, 0.9)); // retrovisores
+    for (const sx of [-larg / 2 - 0.02, larg / 2 + 0.02]) for (const sz of eixos) roda(p, sx, rRoda, sz, rRoda, 0.28);
+    return juntar(p);
   });
 }
 
+// jipe militar estilo "Humvee" com metralhadora no teto
 export function geoJipe() {
   return emCache('jipe', () => {
-    const v = 0x4b5a2a;
-    const partes = [
-      caixa(2.1, 0.8, 4.0, v, 0, 0.9, 0),
-      caixa(2.0, 0.6, 0.12, 0x222222, 0, 1.6, 0.7),
-      caixa(0.1, 0.9, 0.1, 0x222222, -0.95, 1.75, -1.2),
-      caixa(0.1, 0.9, 0.1, 0x222222, 0.95, 1.75, -1.2),
-      caixa(2.0, 0.08, 0.1, 0x222222, 0, 2.2, -1.2),
-      cilindro(0.45, 0.45, 0.3, 0x111111, 0, 1.0, -2.15, Math.PI / 2, 0, 0),
-      caixa(1.6, 0.1, 1.6, 0x333a20, 0, 1.32, -0.6),
+    const v = 0x56633a, escuro = 0x262a1c, vidro = 0x2a3a3a;
+    const p = [
+      perfil([[-2.35, 0.6], [-2.35, 1.95], [0.55, 2.0], [0.95, 1.5], [2.3, 1.35], [2.4, 0.6]], 2.2, v, 0, 0, 0, 0.07),
+      perfil([[-1.9, 1.55], [-1.9, 1.85], [0.45, 1.9], [0.8, 1.55]], 2.36, vidro, 0, 0, 0, 0),
+      caixa(2.3, 0.22, 0.3, escuro, 0, 0.75, 2.45), // para-choque reforçado
+      caixa(0.9, 0.25, 0.08, 0x1a1a1a, 0, 1.05, 2.43), // grade
+      caixa(2.4, 0.08, 1.6, escuro, 0, 1.18, 1.55), // capô com saliência
+      cilindro(0.55, 0.6, 0.25, escuro, 0, 2.12, -0.5, 0, 0, 0, 14), // anel da torre
+      caixa(0.5, 0.45, 0.12, escuro, 0, 2.45, -0.15), // escudo
+      cilindro(0.06, 0.06, 1.3, 0x111111, 0, 2.45, 0.35, Math.PI / 2, 0, 0, 6), // metralhadora
+      caixa(0.18, 0.2, 0.45, 0x111111, 0, 2.42, -0.45),
+      cilindro(0.02, 0.02, 2.2, 0x111111, -0.95, 3.0, -2.0, 0, 0, 0, 4), // antena
+      caixa(0.6, 0.6, 0.12, 0x3c4528, 0, 1.3, -2.42), // estepe
     ];
-    for (const sx of [-1.05, 1.05]) for (const sz of [-1.3, 1.3])
-      partes.push(cilindro(0.48, 0.48, 0.4, 0x111111, sx, 0.48, sz, 0, 0, Math.PI / 2));
-    return juntar(partes);
+    for (const sx of [-1.12, 1.12]) for (const sz of [-1.45, 1.45]) roda(p, sx, 0.58, sz, 0.58, 0.42, 0x3a3a2a);
+    return juntar(p);
   });
 }
 
+// tanque: casco inclinado, saias laterais, esteiras com rodas
 export function geoTanqueCasco() {
-  return emCache('tanqueCasco', () => juntar([
-    caixa(3.2, 1.1, 6.0, 0x4b5320, 0, 1.0, 0),
-    caixa(3.0, 0.4, 1.0, 0x434a1c, 0, 1.2, 3.1, 0.5),
-    caixa(0.8, 1.1, 6.6, 0x1c1c1c, -1.9, 0.6, 0),
-    caixa(0.8, 1.1, 6.6, 0x1c1c1c, 1.9, 0.6, 0),
-  ]));
+  return emCache('tanqueCasco', () => {
+    const v = 0x55602c, escuro = 0x3a4220, est = 0x1c1c1c;
+    const p = [
+      perfil([[-3.3, 0.75], [-3.4, 1.55], [2.3, 1.65], [3.45, 1.0], [3.25, 0.75]], 2.6, v, 0, 0, 0, 0.06),
+      caixa(3.6, 0.1, 6.4, escuro, 0, 1.4, -0.1), // para-lamas
+    ];
+    for (const lado of [-1, 1]) {
+      const x = lado * 1.55;
+      p.push(caixa(0.7, 0.85, 6.4, est, x, 0.5, 0)); // esteira
+      p.push(caixa(0.12, 0.55, 5.6, escuro, x + lado * 0.38, 1.05, 0)); // saia lateral
+      for (let i = 0; i < 6; i++) p.push(cilindro(0.36, 0.36, 0.5, 0x2c2c2c, x, 0.42, -2.5 + i * 1.0, 0, 0, Math.PI / 2, 12));
+      p.push(cilindro(0.3, 0.3, 0.55, 0x3a3a3a, x, 0.7, 3.05, 0, 0, Math.PI / 2, 10)); // roda motriz
+      p.push(cilindro(0.3, 0.3, 0.55, 0x3a3a3a, x, 0.7, -3.05, 0, 0, Math.PI / 2, 10));
+    }
+    p.push(caixa(1.0, 0.3, 0.6, escuro, -0.7, 1.75, -2.6), caixa(1.0, 0.3, 0.6, escuro, 0.7, 1.75, -2.6)); // escapamentos/caixas
+    return juntar(p);
+  });
 }
+// torre do tanque (o cano é separado para o recuo do tiro)
 export function geoTanqueTorre() {
-  return emCache('tanqueTorre', () => juntar([
-    caixa(2.3, 0.9, 2.8, 0x56602a, 0, 0.45, -0.2),
-    cilindro(0.17, 0.2, 4.2, 0x333a18, 0, 0.5, 2.9, Math.PI / 2, 0, 0, 8),
-    cilindro(0.3, 0.3, 0.4, 0x2a2f14, 0.6, 1.05, -0.6),
+  return emCache('tanqueTorre', () => {
+    const v = 0x5f6a33, escuro = 0x3a4220;
+    return juntar([
+      perfil([[-1.6, 0], [-1.7, 0.75], [0.6, 0.9], [1.35, 0.45], [1.3, 0]], 2.3, v, 0, 0, 0, 0.06),
+      caixa(0.8, 0.6, 0.5, escuro, 0, 0.45, 1.45), // mantelete
+      cilindro(0.35, 0.38, 0.25, escuro, 0.55, 1.0, -0.4, 0, 0, 0, 12), // cúpula do comandante
+      cilindro(0.04, 0.04, 0.8, 0x111111, 0.55, 1.25, 0.0, Math.PI / 2, 0, 0, 5), // metralhadora
+      caixa(1.9, 0.5, 0.6, escuro, 0, 0.4, -1.95), // caixa de carga atrás
+      cilindro(0.015, 0.015, 2.4, 0x111111, -0.8, 1.9, -1.2, 0, 0, 0, 4), // antena
+    ]);
+  });
+}
+export function geoTanqueCano() {
+  return emCache('tanqueCano', () => juntar([
+    cilindro(0.15, 0.18, 4.2, 0x3f4722, 0, 0, 2.1, Math.PI / 2, 0, 0, 10),
+    cilindro(0.22, 0.22, 0.5, 0x2a2f14, 0, 0, 4.1, Math.PI / 2, 0, 0, 10), // freio de boca
   ]));
 }
 
+// helicóptero de ataque: fuselagem fina, cabine em tandem, asinhas com foguetes
 export function geoHelicoptero() {
-  return emCache('heli', () => juntar([
-    caixa(2.0, 1.9, 4.4, 0x3b4a30, 0, 0, 0),
-    esfera(1.05, 0x2a3f4f, 0, -0.1, 2.0, 10),
-    cilindro(0.18, 0.35, 5.5, 0x3b4a30, 0, 0.3, -4.8, Math.PI / 2, 0, 0, 8),
-    caixa(0.15, 1.4, 1.0, 0x3b4a30, 0, 0.9, -7.3),
-    caixa(1.8, 0.12, 0.6, 0x3b4a30, 0, 0.3, -7.2),
-    caixa(0.12, 0.12, 3.8, 0x222222, -0.9, -1.4, 0),
-    caixa(0.12, 0.12, 3.8, 0x222222, 0.9, -1.4, 0),
-    caixa(0.1, 0.6, 0.1, 0x222222, -0.9, -1.1, 1),
-    caixa(0.1, 0.6, 0.1, 0x222222, 0.9, -1.1, 1),
-    caixa(0.1, 0.6, 0.1, 0x222222, -0.9, -1.1, -1),
-    caixa(0.1, 0.6, 0.1, 0x222222, 0.9, -1.1, -1),
-    caixa(0.5, 0.3, 1.4, 0x222222, -1.2, -0.3, 0.6),
-    caixa(0.5, 0.3, 1.4, 0x222222, 1.2, -0.3, 0.6),
-  ]));
+  return emCache('heli', () => {
+    const v = 0x3d4a35, escuro = 0x232a1e, vidro = 0x24425a;
+    const p = [
+      perfil([[-2.3, -0.75], [-2.5, 0.55], [-1.2, 0.95], [1.1, 1.0], [2.7, 0.2], [2.9, -0.35], [2.3, -0.8]], 1.3, v, 0, 0, 0, 0.08),
+      elipse(0.75, 0.85, 0.75, 2.0, vidro, 0, 0.75, 1.0), // cabine
+      membro(0.42, 0.18, v, 0, 0.15, -2.2, 0, 0.45, -7.3, 10), // cauda
+      perfil([[-0.4, 0], [-0.9, 2.0], [-0.2, 2.0], [0.4, 0]], 0.12, v, 0, 0.2, -7.3, 0.02), // deriva
+      caixa(2.4, 0.08, 0.6, v, 0, 0.45, -6.7), // estabilizador
+      caixa(1.2, 0.55, 2.0, escuro, 0, 1.25, -0.6), // motores
+      cilindro(0.25, 0.2, 0.6, escuro, -0.6, 1.2, 0.3, Math.PI / 2, 0, 0, 8), cilindro(0.25, 0.2, 0.6, escuro, 0.6, 1.2, 0.3, Math.PI / 2, 0, 0, 8),
+      caixa(4.2, 0.12, 0.8, v, 0, 0.0, 0.2), // asinhas
+      cilindro(0.08, 0.08, 1.4, 0x111111, 0, -0.55, 2.7, Math.PI / 2, 0, 0, 6), // canhão do queixo
+      caixa(0.3, 0.3, 0.3, escuro, 0, -0.45, 2.3),
+    ];
+    for (const x of [-1.5, 1.5]) {
+      p.push(cilindro(0.26, 0.26, 1.6, 0x2b2b2b, x, -0.35, 0.3, Math.PI / 2, 0, 0, 10)); // casulo de foguetes
+      p.push(cilindro(0.2, 0.2, 1.62, 0x111111, x, -0.35, 0.3, Math.PI / 2, 0, 0, 8));
+      p.push(caixa(0.1, 0.35, 0.3, escuro, x, -0.12, 0.3));
+    }
+    for (const x of [-0.85, 0.85]) {
+      p.push(caixa(0.1, 0.1, 3.4, 0x222222, x, -1.35, 0.3)); // esquis
+      p.push(membro(0.04, 0.04, 0x222222, x * 0.6, -0.7, 1.0, x, -1.3, 1.0, 5), membro(0.04, 0.04, 0x222222, x * 0.6, -0.7, -0.6, x, -1.3, -0.6, 5));
+    }
+    return juntar(p);
+  });
 }
 export function geoHeliceHeli() {
   return emCache('helice', () => juntar([
-    caixa(12, 0.06, 0.4, 0x151515, 0, 0, 0),
-    caixa(0.4, 0.06, 12, 0x151515, 0, 0, 0),
-    cilindro(0.2, 0.2, 0.5, 0x151515, 0, -0.25, 0),
+    caixa(12, 0.06, 0.45, 0x151515, 0, 0, 0),
+    caixa(0.45, 0.06, 12, 0x151515, 0, 0, 0),
+    cilindro(0.3, 0.25, 0.5, 0x151515, 0, -0.25, 0, 0, 0, 0, 10),
+  ]));
+}
+export function geoHeliceCauda() {
+  return emCache('heliceCauda', () => juntar([
+    caixa(0.05, 2.0, 0.22, 0x151515, 0, 0, 0),
+    caixa(0.05, 0.22, 2.0, 0x151515, 0, 0, 0),
   ]));
 }
 

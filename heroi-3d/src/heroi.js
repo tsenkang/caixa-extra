@@ -19,12 +19,25 @@ function geoEstrela(r1, r2) {
   return new THREE.ShapeGeometry(s);
 }
 
+// raio em zigue-zague (emblema do Corisco)
+function geoRaioEmblema(t) {
+  const s = new THREE.Shape();
+  const pts = [[0.2, 1], [-0.45, -0.05], [0.0, -0.05], [-0.25, -1], [0.5, 0.15], [0.05, 0.15], [0.35, 1]];
+  s.moveTo(pts[0][0] * t, pts[0][1] * t);
+  for (const [x, y] of pts.slice(1)) s.lineTo(x * t, y * t);
+  return new THREE.ShapeGeometry(s);
+}
+
 // boneco articulado (usado pelo herói e pelos heróis inimigos)
 // proporções de "herói de desenho": ombros largos, cintura fina, cotovelos e joelhos articulados
 export function criarHumanoide(cores, escala = 1) {
   const mat = (c) => new THREE.MeshToonMaterial({ color: c, gradientMap: gradienteToon });
+  // físico: multiplicadores de ombros, braços, pernas e cabeça (o Colosso é bem mais forte)
+  const fis = { ombros: 1, bracos: 1, pernas: 1, cabeca: 1, ...(cores.fisico || {}) };
+  const O = fis.ombros, B = fis.bracos, P = fis.pernas;
   const mUniforme = mat(cores.uniforme);
   const mDetalhe = mat(cores.detalhe);
+  if (cores.brilho) { mDetalhe.emissive.set(cores.detalhe); mDetalhe.emissiveIntensity = 1.6; } // detalhes que brilham
   const mPele = mat(cores.pele ?? 0xf1c27d);
   const mBota = mat(cores.botas ?? cores.detalhe);
   const mCabelo = mat(cores.cabelo ?? 0x1a1a1a);
@@ -47,14 +60,24 @@ export function criarHumanoide(cores, escala = 1) {
   malha(elip(0.2, 1.05, 0.62, 0.78), mDetalhe, 0, -0.02, 0, corpo); // sunga/calção
   malha(tronco(0.19, 0.17, 0.12).scale(1, 1, 0.75), mat(cores.cinto ?? 0xfacc15), 0, 0.09, 0, corpo); // cinto
   malha(new THREE.BoxGeometry(0.1, 0.08, 0.03), mat(cores.fivela ?? 0xfff3a0), 0, 0.09, 0.14, corpo); // fivela
-  malha(tronco(0.24, 0.18, 0.3).scale(1, 1, 0.68), mUniforme, 0, 0.28, 0, corpo); // abdômen
-  malha(elip(0.29, 1, 0.78, 0.62), mUniforme, 0, 0.5, 0, corpo); // peito
-  malha(elip(0.12, 1.1, 0.75, 0.55), mUniforme, -0.1, 0.5, 0.09, corpo); // peitoral
-  malha(elip(0.12, 1.1, 0.75, 0.55), mUniforme, 0.1, 0.5, 0.09, corpo);
-  malha(elip(0.11, 1, 0.9, 1), mUniforme, -0.31, 0.6, 0, corpo); // ombros
-  malha(elip(0.11, 1, 0.9, 1), mUniforme, 0.31, 0.6, 0, corpo);
+  malha(tronco(0.24 * O, 0.18, 0.3).scale(1, 1, 0.68), mUniforme, 0, 0.28, 0, corpo); // abdômen
+  malha(elip(0.29, O, 0.78, 0.62 * Math.sqrt(O)), mUniforme, 0, 0.5, 0, corpo); // peito
+  malha(elip(0.12, 1.1 * O, 0.75, 0.55), mUniforme, -0.1 * O, 0.5, 0.09, corpo); // peitoral
+  malha(elip(0.12, 1.1 * O, 0.75, 0.55), mUniforme, 0.1 * O, 0.5, 0.09, corpo);
+  const mBraco = cores.bracosPele ? mPele : mUniforme;
+  malha(elip(0.11 * B, 1, 0.9, 1), mUniforme, -0.31 * O, 0.6, 0, corpo); // ombros
+  malha(elip(0.11 * B, 1, 0.9, 1), mUniforme, 0.31 * O, 0.6, 0, corpo);
+  if (cores.espinhos) {
+    for (const lado of [-1, 1]) for (const dz of [-0.05, 0.06]) {
+      const e = malha(new THREE.ConeGeometry(0.045 * B, 0.2, 6), mat(cores.espinhos), lado * 0.33 * O, 0.72, dz, corpo);
+      e.rotation.z = -lado * 0.5;
+    }
+  }
   if (cores.emblema !== undefined) {
-    const emb = new THREE.Mesh(geoEstrela(0.11, 0.045), new THREE.MeshToonMaterial({ color: cores.emblema, gradientMap: gradienteToon, side: THREE.DoubleSide }));
+    const geoEmb = cores.emblemaRaio ? geoRaioEmblema(0.13) : geoEstrela(0.11, 0.045);
+    const matEmb = new THREE.MeshToonMaterial({ color: cores.emblema, gradientMap: gradienteToon, side: THREE.DoubleSide });
+    if (cores.brilho) { matEmb.emissive.set(cores.emblema); matEmb.emissiveIntensity = 2; }
+    const emb = new THREE.Mesh(geoEmb, matEmb);
     emb.position.set(0, 0.53, 0.185);
     emb.rotation.x = -0.12;
     emb.userData.semContorno = true;
@@ -64,7 +87,8 @@ export function criarHumanoide(cores, escala = 1) {
 
   // cabeça
   const cabeca = new THREE.Group();
-  cabeca.position.y = 0.9;
+  cabeca.position.y = 0.9 - (1 - fis.cabeca) * 0.12;
+  cabeca.scale.setScalar(fis.cabeca);
   corpo.add(cabeca);
   malha(elip(0.135, 0.92, 1.12, 1), mPele, 0, 0, 0, cabeca);
   malha(elip(0.1, 1.05, 0.7, 0.95), mPele, 0, -0.07, 0.03, cabeca); // queixo
@@ -100,16 +124,16 @@ export function criarHumanoide(cores, escala = 1) {
   const bracos = [], antebracos = [];
   for (const lado of [-1, 1]) {
     const ombro = new THREE.Group();
-    ombro.position.set(lado * 0.34, 0.58, 0);
+    ombro.position.set(lado * 0.34 * O, 0.58, 0);
     corpo.add(ombro);
-    malha(tronco(0.08, 0.065, 0.32), mUniforme, 0, -0.16, 0, ombro); // braço
+    malha(tronco(0.08 * B, 0.065 * B, 0.32), mBraco, 0, -0.16, 0, ombro); // braço
     const cotovelo = new THREE.Group();
     cotovelo.position.y = -0.32;
     ombro.add(cotovelo);
-    malha(new THREE.SphereGeometry(0.065, 10, 8), mUniforme, 0, 0, 0, cotovelo);
-    malha(tronco(0.065, 0.055, 0.2), mUniforme, 0, -0.1, 0, cotovelo); // antebraço
-    malha(tronco(0.075, 0.06, 0.12), mDetalhe, 0, -0.2, 0, cotovelo); // punho da luva
-    malha(elip(0.065, 0.9, 1.2, 0.8), mDetalhe, 0, -0.32, 0.01, cotovelo); // mão
+    malha(new THREE.SphereGeometry(0.065 * B, 10, 8), mBraco, 0, 0, 0, cotovelo);
+    malha(tronco(0.065 * B, 0.055 * B, 0.2), mBraco, 0, -0.1, 0, cotovelo); // antebraço
+    malha(tronco(0.075 * B, 0.06 * B, 0.12), mDetalhe, 0, -0.2, 0, cotovelo); // punho da luva
+    malha(elip(0.065 * B, 0.9, 1.2, 0.8), mDetalhe, 0, -0.32, 0.01, cotovelo); // mão
     bracos.push(ombro);
     antebracos.push(cotovelo);
   }
@@ -119,14 +143,14 @@ export function criarHumanoide(cores, escala = 1) {
     const quadril = new THREE.Group();
     quadril.position.set(lado * 0.12, -0.04, 0);
     corpo.add(quadril);
-    malha(tronco(0.105, 0.08, 0.46), mUniforme, 0, -0.23, 0, quadril); // coxa
+    malha(tronco(0.105 * P, 0.08 * P, 0.46), mUniforme, 0, -0.23, 0, quadril); // coxa
     const joelho = new THREE.Group();
     joelho.position.y = -0.46;
     quadril.add(joelho);
-    malha(new THREE.SphereGeometry(0.08, 10, 8), mUniforme, 0, 0, 0, joelho);
-    malha(tronco(0.08, 0.065, 0.2), mUniforme, 0, -0.1, 0, joelho); // canela
-    malha(tronco(0.095, 0.075, 0.28), mBota, 0, -0.3, 0, joelho); // bota
-    malha(tronco(0.1, 0.1, 0.05), mBota, 0, -0.17, 0, joelho); // borda da bota
+    malha(new THREE.SphereGeometry(0.08 * P, 10, 8), mUniforme, 0, 0, 0, joelho);
+    malha(tronco(0.08 * P, 0.065 * P, 0.2), mUniforme, 0, -0.1, 0, joelho); // canela
+    malha(tronco(0.095 * P, 0.075 * P, 0.28), mBota, 0, -0.3, 0, joelho); // bota
+    malha(tronco(0.1 * P, 0.1 * P, 0.05), mBota, 0, -0.17, 0, joelho); // borda da bota
     malha(elip(0.075, 1, 0.55, 1.6), mBota, 0, -0.44, 0.05, joelho); // pé
     pernas.push(quadril);
     canelas.push(joelho);

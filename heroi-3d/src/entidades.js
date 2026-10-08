@@ -2,7 +2,7 @@
 // Também tem a rede de ruas usada pelos veículos.
 import * as THREE from 'three';
 import { RUAS_X, RUAS_Z, FAIXA, FIM_X, FIM_Z, QUARTEIROES, CALCADA } from './cidade.js';
-import { materialCores, materialQueimado, geoPessoa, geoCarro, geoBomba, adicionarContorno } from './modelos.js';
+import { materialCores, materialQueimado, geoPessoa, geoCarro, geoBomba, adicionarContorno, TIPOS_CARRO } from './modelos.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Vector3();
@@ -390,7 +390,32 @@ const CORES_CARRO = [0xd62828, 0x1d70b8, 0xf2f2f2, 0x222222, 0xf4c20d, 0x2a9d8f,
 export class Carro extends Veiculo {
   constructor(jogo, de, s) {
     const cor = CORES_CARRO[(Math.random() * CORES_CARRO.length) | 0];
-    super(jogo, new THREE.Mesh(geoCarro(cor), materialCores), { tipo: 'carro', raio: 2.1, altura: 1.6, vida: 60, massa: 3, de, s, velocidade: 9 + Math.random() * 5 });
+    // sorteia o modelo: mais sedãs, alguns SUVs/picapes/táxis, poucos ônibus e viaturas
+    const r = Math.random();
+    const modelo = r < 0.36 ? 'sedan' : r < 0.56 ? 'suv' : r < 0.7 ? 'picape' : r < 0.83 ? 'taxi' : r < 0.93 ? 'policia' : 'onibus';
+    const t = TIPOS_CARRO[modelo];
+    const corFinal = modelo === 'onibus' ? [0xf2b705, 0x1e6fd9, 0xe8e8e8, 0x2a9d8f][(Math.random() * 4) | 0] : cor;
+    const mesh = new THREE.Mesh(geoCarro(corFinal, modelo), materialCores);
+    super(jogo, mesh, { tipo: 'carro', raio: t.raio, altura: t.altura, vida: t.vida, massa: t.massa, de, s, velocidade: (9 + Math.random() * 5) * t.vel });
+    this.modelo = modelo;
+    if (modelo === 'policia') {
+      // giroflex: duas luzes que piscam
+      this.luzes = [0xff2030, 0x2050ff].map((c, i) => {
+        const l = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.16, 0.28), new THREE.MeshBasicMaterial({ color: c }));
+        l.position.set(i ? 0.27 : -0.27, 1.8, -0.3);
+        mesh.add(l);
+        return l;
+      });
+    }
+  }
+
+  atualizar(dt) {
+    super.atualizar(dt);
+    if (this.luzes) {
+      const ligado = this.estado !== 'morto' && Math.floor(this.jogo.tempo * 6) % 2 === 0;
+      this.luzes[0].material.color.setHex(ligado ? 0xff2030 : 0x401015).multiplyScalar(ligado ? 4 : 1);
+      this.luzes[1].material.color.setHex(!ligado && this.estado !== 'morto' ? 0x2050ff : 0x101840).multiplyScalar(!ligado && this.estado !== 'morto' ? 4 : 1);
+    }
   }
 
   ia(dt) {
@@ -402,7 +427,7 @@ export class Carro extends Veiculo {
       if (e === this || !(e instanceof Veiculo) || e.estado !== 'normal') continue;
       const dx = e.pos.x - this.pos.x, dz = e.pos.z - this.pos.z;
       const frente = dx * fx + dz * fz;
-      if (frente > 0 && frente < 9 && Math.abs(dx * fz - dz * fx) < 1.5) { alvo = 0; break; }
+      if (frente > 0 && frente < this.raio + e.raio + 3 && Math.abs(dx * fz - dz * fx) < 1.5) { alvo = 0; break; }
     }
     // pânico: acelera se o herói estiver perto
     const h = this.jogo.heroi.pos;

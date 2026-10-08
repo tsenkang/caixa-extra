@@ -1,7 +1,7 @@
 // Inimigos: soldados, jipes, tanques, helicópteros e heróis inimigos. Também os tiros e mísseis.
 import * as THREE from 'three';
 import { Entidade, Veiculo, NOS, NOS_PONTA, anguloLerp } from './entidades.js';
-import { materialCores, geoSoldado, geoJipe, geoTanqueCasco, geoTanqueTorre, geoHelicoptero, geoHeliceHeli, geoPedra } from './modelos.js';
+import { materialCores, geoSoldado, geoJipe, geoTanqueCasco, geoTanqueTorre, geoTanqueCano, geoHelicoptero, geoHeliceHeli, geoHeliceCauda, geoPedra } from './modelos.js';
 import { criarHumanoide, animarHumanoide } from './heroi.js';
 import { Raio } from './efeitos.js';
 
@@ -216,6 +216,7 @@ export class Jipe extends VeiculoMilitar {
     const alvo = perto ? 0 : this.velocidade;
     this.velAtual += (alvo - this.velAtual) * Math.min(1, dt * 2);
     this.dirigir(dt, this.velAtual);
+    escapamento(this, 2.4, 0.8);
     if (perto && !this.descarregou && this.velAtual < 2) {
       this.descarregou = true;
       const a = this.obj.rotation.y;
@@ -231,11 +232,17 @@ export class Tanque extends VeiculoMilitar {
   constructor(jogo, de) {
     const grupo = new THREE.Group();
     grupo.add(new THREE.Mesh(geoTanqueCasco(), materialCores));
-    const torre = new THREE.Mesh(geoTanqueTorre(), materialCores);
-    torre.position.y = 1.55;
+    const torre = new THREE.Group();
+    torre.position.y = 1.6;
+    torre.add(new THREE.Mesh(geoTanqueTorre(), materialCores));
+    const cano = new THREE.Mesh(geoTanqueCano(), materialCores);
+    cano.position.set(0, 0.45, 1.5);
+    torre.add(cano);
     grupo.add(torre);
     super(jogo, grupo, { tipo: 'tanque', raio: 3.4, altura: 2.6, vida: 320, massa: 8, inimigo: true, de, velocidade: 8 });
     this.torre = torre;
+    this.cano = cano;
+    this.recuo = 0;
     this.tiro = 3;
   }
   ia(dt) {
@@ -248,21 +255,40 @@ export class Tanque extends VeiculoMilitar {
     jogo.heroi.centro(_h);
     const ang = Math.atan2(_h.x - this.pos.x, _h.z - this.pos.z) - this.obj.rotation.y;
     this.torre.rotation.y = anguloLerp(this.torre.rotation.y, ang, Math.min(1, dt * 2));
+    // cano sobe/desce mirando e recua depois do tiro
+    const elev = Math.max(-0.45, Math.min(0.08, -Math.atan2(_h.y - this.pos.y - 2.1, Math.max(1, dist))));
+    this.cano.rotation.x += (elev - this.cano.rotation.x) * Math.min(1, dt * 3);
+    this.recuo = Math.max(0, this.recuo - dt * 2.5);
+    this.cano.position.z = 1.5 - this.recuo * 0.9;
+    escapamento(this, 3.4, 1.4);
     this.tiro -= dt;
     if (this.tiro <= 0 && dist < 160 && !jogo.heroi.morto) {
       this.tiro = 3.5 + Math.random() * 1.5;
       const a = this.obj.rotation.y + this.torre.rotation.y;
-      _c.set(this.pos.x + Math.sin(a) * 5, this.pos.y + 2.1, this.pos.z + Math.cos(a) * 5);
+      _c.set(this.pos.x + Math.sin(a) * 6.2, this.pos.y + 2.05, this.pos.z + Math.cos(a) * 6.2);
       if (enxerga(jogo, _c, _h)) {
         _d.set(_h.x + (Math.random() - 0.5) * 3, _h.y + (Math.random() - 0.5) * 2, _h.z + (Math.random() - 0.5) * 3).sub(_c).normalize();
         jogo.projeteis.missil(_c, _d, { vel: 90, teleguiado: 0, raio: 5, dano: 35 });
-        jogo.efeitos.fogo(_c, 6, 0.5, 2);
-        jogo.efeitos.fumaca(_c, 3, 3, 0.5);
+        jogo.efeitos.fogo(_c, 10, 0.6, 2.5);
+        jogo.efeitos.fumaca(_c, 6, 3, 0.5);
+        jogo.efeitos.clarao(_c, 0.8, 0.15, 0xffc070);
+        this.recuo = 1;
+        _v.copy(this.pos).y = 0.5;
+        jogo.efeitos.ondaDeChoque(_v, 8, 0.4, 0xd8c9a8); // poeira levantada pelo disparo
+        jogo.efeitos.poeira(_v, 6, 5, 4);
         jogo.tremerPerto(_c, 0.2);
         jogo.audio?.canhao(_c);
       }
     }
   }
+}
+
+// fumaça do escapamento atrás do veículo
+function escapamento(v, distTras, altura) {
+  if (v.estado !== 'normal' || Math.random() > 0.25 + v.velAtual * 0.02) return;
+  const a = v.obj.rotation.y;
+  _c.set(v.pos.x - Math.sin(a) * distTras, v.pos.y + altura, v.pos.z - Math.cos(a) * distTras);
+  v.jogo.efeitos.fumaca(_c, 1, 1.2, 0.3);
 }
 
 // ---------- helicóptero ----------
@@ -273,10 +299,15 @@ export class Helicoptero extends Entidade {
     corpo.position.y = 1.6;
     grupo.add(corpo);
     const helice = new THREE.Mesh(geoHeliceHeli(), materialCores);
-    helice.position.y = 2.9;
+    helice.position.y = 3.2;
     grupo.add(helice);
+    const cauda = new THREE.Mesh(geoHeliceCauda(), materialCores);
+    cauda.position.set(0.2, 2.9, -7.75);
+    grupo.add(cauda);
     super(jogo, grupo, { tipo: 'heli', raio: 3.5, altura: 3, vida: 160, massa: 5, inimigo: true });
     this.helice = helice;
+    this.heliceCauda = cauda;
+    this.lado = 1;
     this.pos.copy(pos);
     this.angulo = Math.random() * Math.PI * 2;
     this.tiro = 4;
@@ -284,6 +315,7 @@ export class Helicoptero extends Entidade {
   }
   atualizar(dt) {
     this.helice.rotation.y += dt * (this.caindo ? 10 : 30);
+    this.heliceCauda.rotation.x += dt * (this.caindo ? 8 : 40);
     super.atualizar(dt);
   }
   ia(dt) {
@@ -298,12 +330,26 @@ export class Helicoptero extends Entidade {
     this.pos.addScaledVector(this.vel, dt);
     jogo.heroi.centro(_h);
     this.obj.rotation.y = anguloLerp(this.obj.rotation.y, Math.atan2(_h.x - this.pos.x, _h.z - this.pos.z), Math.min(1, dt * 3));
-    this.obj.rotation.x = 0.1;
+    // inclina para o lado e para frente conforme se move
+    const ry = this.obj.rotation.y;
+    const lateral = this.vel.x * Math.cos(ry) - this.vel.z * Math.sin(ry);
+    const frente = this.vel.x * Math.sin(ry) + this.vel.z * Math.cos(ry);
+    this.obj.rotation.z += (Math.max(-0.4, Math.min(0.4, -lateral * 0.025)) - this.obj.rotation.z) * Math.min(1, dt * 3);
+    this.obj.rotation.x += (0.05 + Math.max(-0.25, Math.min(0.3, frente * 0.015)) - this.obj.rotation.x) * Math.min(1, dt * 3);
+    // poeira do vento das hélices quando está baixo
+    if (this.pos.y < 22 && Math.random() < 0.5) {
+      const a = Math.random() * Math.PI * 2;
+      _c.set(this.pos.x + Math.cos(a) * 6, 0.5, this.pos.z + Math.sin(a) * 6);
+      jogo.efeitos.normal.emitir(_c.x, _c.y, _c.z, { vx: Math.cos(a) * 12, vy: 1, vz: Math.sin(a) * 12, vida: 1.2, tamIni: 2, tamFim: 6, alfa: 0.4, gravidade: 0, arrasto: 1.2, r: 0.7, g: 0.66, b: 0.58 });
+    }
     if (jogo.predios.solido(this.pos.x, this.pos.y + 1.5, this.pos.z)) this.levarDano(40 * dt, 'inimigo');
     this.tiro -= dt;
     if (this.tiro <= 0 && !jogo.heroi.morto) {
       this.tiro = 3 + Math.random() * 1.5;
-      _c.copy(this.pos).y += 0.8;
+      // foguete sai do casulo da direita ou da esquerda
+      this.lado = -this.lado;
+      _c.set(this.lado * 1.5, 1.25, 1.2).applyEuler(this.obj.rotation).add(this.pos);
+      jogo.efeitos.fogo(_c, 4, 0.3, 1.5);
       if (enxerga(jogo, _c, _h)) {
         _d.subVectors(_h, _c).normalize();
         jogo.projeteis.missil(_c, _d, { vel: 55, teleguiado: 1.4, raio: 4.5, dano: 30 });
@@ -338,15 +384,15 @@ export class Helicoptero extends Entidade {
 const TIPOS = {
   raio: {
     nome: 'VOLTAGEM', vida: 450, escala: 1.1, corBarra: 'linear-gradient(90deg,#0284c7,#7dd3fc)',
-    cores: { uniforme: 0x0f172a, detalhe: 0x38bdf8, capa: 0x1e3a8a, cinto: 0x38bdf8, emblema: 0x7dd3fc, cabelo: 0xe5e7eb, mascara: 0x38bdf8 },
+    cores: { uniforme: 0x101a33, detalhe: 0x38bdf8, capa: 0x1e3a8a, cinto: 0x38bdf8, emblema: 0x7dd3fc, cabelo: 0xe5e7eb, mascara: 0x38bdf8, brilho: true, olho: 0x38bdf8 },
   },
   rapido: {
     nome: 'CORISCO', vida: 320, escala: 1, corBarra: 'linear-gradient(90deg,#ca8a04,#fde047)',
-    cores: { uniforme: 0xfacc15, detalhe: 0xdc2626, botas: 0xdc2626, cinto: 0xdc2626, emblema: 0xdc2626, mascara: 0xdc2626, cabelo: 0x7a3b10 },
+    cores: { uniforme: 0xfacc15, detalhe: 0xdc2626, botas: 0xdc2626, cinto: 0xdc2626, emblema: 0xdc2626, mascara: 0xdc2626, cabelo: 0x7a3b10, emblemaRaio: true, fisico: { ombros: 0.92, bracos: 0.9, pernas: 0.95 } },
   },
   gigante: {
     nome: 'COLOSSO', vida: 1600, escala: 4.5, corBarra: 'linear-gradient(90deg,#15803d,#a855f7)',
-    cores: { uniforme: 0x4d7c0f, detalhe: 0x6b21a8, botas: 0x3b0764, cinto: 0x6b21a8, emblema: 0xa855f7, cabelo: 0x111111, pele: 0x9ca36b },
+    cores: { uniforme: 0x3f6212, detalhe: 0x6b21a8, botas: 0x3b0764, cinto: 0x6b21a8, emblema: 0xa855f7, cabelo: 0x111111, pele: 0x8fa35a, bracosPele: true, espinhos: 0xc084fc, fisico: { ombros: 1.45, bracos: 1.75, pernas: 1.35, cabeca: 0.82 } },
   },
 };
 
@@ -424,9 +470,29 @@ export class HeroiInimigo extends Entidade {
   }
 
   ia(dt) {
+    this.aura();
     if (this.variante === 'raio') this.iaRaio(dt);
     else if (this.variante === 'rapido') this.iaRapido(dt);
     else this.iaGigante(dt);
+  }
+
+  // aura de energia em volta de cada herói inimigo
+  aura() {
+    const ef = this.jogo.efeitos;
+    this.centro(_c);
+    const r = this.raio * 1.4;
+    if (this.variante === 'raio' && Math.random() < 0.6) {
+      // faíscas elétricas azuis
+      _v.set(_c.x + (Math.random() - 0.5) * r, _c.y + (Math.random() - 0.5) * this.altura * 0.8, _c.z + (Math.random() - 0.5) * r);
+      ef.faiscas(_v, 2, 6, [0.4, 0.75, 1]);
+    } else if (this.variante === 'rapido' && Math.random() < 0.3) {
+      _v.set(_c.x + (Math.random() - 0.5) * r, _c.y + (Math.random() - 0.5) * this.altura * 0.7, _c.z + (Math.random() - 0.5) * r);
+      ef.faiscas(_v, 1, 4, [1, 0.85, 0.2]);
+    } else if (this.variante === 'gigante' && Math.random() < 0.35) {
+      // vapor roxo saindo do corpo
+      _v.set(_c.x + (Math.random() - 0.5) * r, _c.y + (Math.random() - 0.3) * this.altura * 0.6, _c.z + (Math.random() - 0.5) * r);
+      ef.aditivo.emitir(_v.x, _v.y, _v.z, { vx: 0, vy: 2, vz: 0, vida: 0.8, tamIni: 2.5, tamFim: 0.5, alfa: 0.35, gravidade: -1, arrasto: 1, r: 0.6, g: 0.25, b: 0.9 });
+    }
   }
 
   iaRaio(dt) {
