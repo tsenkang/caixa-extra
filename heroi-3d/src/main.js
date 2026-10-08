@@ -8,6 +8,8 @@ import { Controles } from './controles.js';
 import { CameraHeroi } from './camera.js';
 import { Heroi } from './heroi.js';
 import { Populacao } from './entidades.js';
+import { Mira, Laser, Soco } from './poderes.js';
+import { Hud } from './hud.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Vector3();
@@ -42,6 +44,11 @@ class Jogo {
     this.heroi.yawCorpo = Math.PI;
     this.camera.yaw = 0;
     this.populacao = new Populacao(this);
+    this.mira = new Mira(this);
+    this.laser = new Laser(this);
+    this.soco = new Soco(this);
+    this.hud = new Hud(this);
+    this.stats = { inimigos: 0, pessoas: 0 };
 
     this.relogio = new THREE.Clock();
     this.fps = { quadros: 0, tempo: 0, el: document.getElementById('fps') };
@@ -55,6 +62,14 @@ class Jogo {
   }
 
   // ---------- ganchos chamados pelos sistemas ----------
+  aoDestruirPredio(p) {
+    this.hud.mensagem(p.nome === 'casa' ? 'CASA DESTRUÍDA!' : 'PRÉDIO DESTRUÍDO!', '#fbbf24');
+  }
+  aoDesabar(centro, qtd) {
+    this.tremerPerto(centro, Math.min(0.8, 0.2 + qtd / 300));
+    this.marcarPerigo(centro, 50);
+    this.audio?.desabamento(Math.min(1, qtd / 200), centro);
+  }
   tremerPerto(pos, qtd) {
     const d = pos.distanceTo(this.heroi.pos);
     const f = Math.max(0, 1 - d / 120);
@@ -95,7 +110,7 @@ class Jogo {
   quadro() {
     const dt = Math.min(0.05, this.relogio.getDelta());
     if (!this.pausado) this.atualizar(dt);
-    this.camera.atualizar(this.pausado ? 0 : dt, this.heroi, this.predios);
+    if (this.pausado) this.camera.atualizar(0, this.heroi, this.predios);
     this.efeitos.desenharVento(dt, this.heroi.superVelocidade && !this.pausado ? Math.min(1, this.heroi.vel.length() / 100) : 0);
     // céu e sombra seguem o herói
     this.ceu.position.copy(this.cam3.position);
@@ -112,6 +127,10 @@ class Jogo {
     this.camera.girar(ctrl.dx, ctrl.dy);
     this.camera.calcularEixos();
     this.heroi.atualizar(dt, ctrl, this.camera);
+    this.camera.atualizar(dt, this.heroi, this.predios);
+    this.mira.atualizar();
+    this.laser.atualizar(dt, ctrl.mouseEsq);
+    this.soco.atualizar(dt, ctrl.apertou('KeyE'));
 
     for (const e of this.entidades) e.atualizar(dt);
     for (let i = this.entidades.length - 1; i >= 0; i--) {
@@ -123,6 +142,7 @@ class Jogo {
     this.predios.atualizar(dt);
     this.detritos.atualizar(dt);
     this.efeitos.atualizar(dt, this.cam3, this.renderer.domElement.clientHeight);
+    this.hud.atualizar(dt);
     ctrl.limpar();
   }
 

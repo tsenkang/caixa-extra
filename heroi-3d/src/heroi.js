@@ -242,13 +242,15 @@ export class Heroi {
     const rapido = this.vel.length() > 12;
     if (rapido) {
       this.pos.addScaledVector(this.vel, dt);
-    } else {
+    } else if (!this.bateEmPredio(this.pos)) {
       // devagar: colide com as paredes (eixo por eixo para deslizar)
       for (const eixo of ['x', 'y', 'z']) {
         const antes = this.pos[eixo];
         this.pos[eixo] += this.vel[eixo] * dt;
         if (this.bateEmPredio(this.pos)) { this.pos[eixo] = antes; this.vel[eixo] = 0; }
       }
+    } else {
+      this.pos.addScaledVector(this.vel, dt); // já está dentro de um bloco: deixa sair
     }
     if (this.pos.y < 0) { this.pos.y = 0; if (this.vel.y < 0) this.vel.y = 0; }
     if (this.pos.y > 400) { this.pos.y = 400; this.vel.y = Math.min(0, this.vel.y); }

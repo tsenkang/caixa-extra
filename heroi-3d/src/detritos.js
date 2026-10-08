@@ -4,7 +4,7 @@
 // No máximo MAX pedaços ao mesmo tempo: os mais antigos são apagados.
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { texturaConcreto } from './texturas.js';
+import { texturaJanela } from './texturas.js';
 
 const MAX = 1500;
 const MAX_FISICA = 300;
@@ -34,7 +34,7 @@ export class SistemaDetritos {
     this.poolCorpos = [];
 
     // malha instanciada
-    const mat = new THREE.MeshLambertMaterial({ map: texturaConcreto() });
+    const mat = new THREE.MeshLambertMaterial({ map: texturaJanela() }); // pedaços com a cara do prédio
     this.malha = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, MAX);
     this.malha.castShadow = true;
     this.malha.receiveShadow = true;

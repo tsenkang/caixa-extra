@@ -135,10 +135,13 @@ export class Efeitos {
     b.t = 0; b.dur = dur; b.raio = raio;
   }
 
-  ondaDeChoque(p, raio, dur = 0.5, cor = 0xffffff) {
+  ondaDeChoque(p, raio, dur = 0.5, cor = 0xffffff, normal = null) {
     const o = this.ondas.find((x) => !x.m.visible) || this.ondas[0];
     o.m.visible = true;
     o.m.position.copy(p);
+    // o anel nasce deitado; com "normal" ele fica de frente para a direção do golpe
+    if (normal) o.m.quaternion.setFromUnitVectors(CIMA, normal);
+    else o.m.quaternion.identity();
     o.m.material.color.set(cor);
     o.t = 0; o.dur = dur; o.raio = raio;
   }
