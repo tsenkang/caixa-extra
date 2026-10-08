@@ -274,6 +274,22 @@ export class Heroi {
     }
     this.tempoQuebra -= dt;
 
+    // voando rápido por cima de gente/carros: tudo sai voando
+    if (rapido) {
+      this.centro(_centro);
+      for (const e of jogo.entidades) {
+        if (e === this.segurando || e.remover || e.estado === 'preso' || e.estado === 'arremessado') continue;
+        e.centro(_v);
+        const r = e.raio + 1;
+        if (_v.distanceToSquared(_centro) > r * r) continue;
+        e.levarDano(this.vel.length() * 0.8, 'heroi');
+        _v.copy(this.vel).multiplyScalar(1.1 / Math.sqrt(e.massa)).y += 8;
+        e.lancar(_v, true);
+        jogo.camera.tremer(0.2);
+        jogo.audio?.impacto(0.6, _centro);
+      }
+    }
+
     // ---------- vida ----------
     this.tempoSemDano += dt;
     if (this.tempoSemDano > 4) this.vida = Math.min(this.vidaMax, this.vida + 30 * dt);

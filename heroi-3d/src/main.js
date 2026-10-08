@@ -8,7 +8,7 @@ import { Controles } from './controles.js';
 import { CameraHeroi } from './camera.js';
 import { Heroi } from './heroi.js';
 import { Populacao } from './entidades.js';
-import { Mira, Laser, Soco } from './poderes.js';
+import { Mira, Laser, Soco, Agarrar } from './poderes.js';
 import { Hud } from './hud.js';
 
 const _v = new THREE.Vector3();
@@ -47,6 +47,7 @@ class Jogo {
     this.mira = new Mira(this);
     this.laser = new Laser(this);
     this.soco = new Soco(this);
+    this.agarrar = new Agarrar(this);
     this.hud = new Hud(this);
     this.stats = { inimigos: 0, pessoas: 0 };
 
@@ -131,6 +132,7 @@ class Jogo {
     this.mira.atualizar();
     this.laser.atualizar(dt, ctrl.mouseEsq);
     this.soco.atualizar(dt, ctrl.apertou('KeyE'));
+    this.agarrar.atualizar(dt, ctrl);
 
     for (const e of this.entidades) e.atualizar(dt);
     for (let i = this.entidades.length - 1; i >= 0; i--) {
