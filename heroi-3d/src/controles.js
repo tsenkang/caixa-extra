@@ -33,7 +33,7 @@ export class Controles {
     });
     addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('mousemove', (e) => {
-      if (!this.travado) return;
+      if (!this.travado && !this.semTrava) return;
       this.dx += e.movementX;
       this.dy += e.movementY;
     });
@@ -44,10 +44,17 @@ export class Controles {
   }
 
   travar() {
+    // se o navegador não deixar travar o mouse, o jogo usa o movimento normal do mouse
+    const falhou = () => { this.semTrava = true; };
     try {
       const r = this.canvas.requestPointerLock({ unadjustedMovement: true });
-      if (r && r.catch) r.catch(() => this.canvas.requestPointerLock());
-    } catch { this.canvas.requestPointerLock(); }
+      if (r && r.catch) r.catch(() => {
+        try { const r2 = this.canvas.requestPointerLock(); if (r2 && r2.catch) r2.catch(falhou); } catch { falhou(); }
+      });
+    } catch { falhou(); }
+    document.addEventListener('pointerlockerror', falhou, { once: true });
+    // clicar de novo no jogo tenta travar outra vez
+    this.canvas.addEventListener('click', () => { if (!this.travado) { try { this.canvas.requestPointerLock()?.catch?.(() => {}); } catch {} } });
   }
 
   segura(...codigos) { return codigos.some((c) => this.teclas.has(c)); }
