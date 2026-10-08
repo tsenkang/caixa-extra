@@ -1,5 +1,6 @@
 // O herói: modelo feito com cápsulas/caixas, voo e colisão com prédios.
 import * as THREE from 'three';
+import { gradienteToon, materialContorno } from './modelos.js';
 
 const _v = new THREE.Vector3();
 const _desejo = new THREE.Vector3();
@@ -19,12 +20,22 @@ function geoEstrela(r1, r2) {
 }
 
 // boneco articulado (usado pelo herói e pelos heróis inimigos)
+// proporções de "herói de desenho": ombros largos, cintura fina, cotovelos e joelhos articulados
 export function criarHumanoide(cores, escala = 1) {
-  const mat = (c, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.15, ...extra });
+  const mat = (c) => new THREE.MeshToonMaterial({ color: c, gradientMap: gradienteToon });
   const mUniforme = mat(cores.uniforme);
   const mDetalhe = mat(cores.detalhe);
-  const mPele = mat(cores.pele ?? 0xf1c27d, { metalness: 0 });
+  const mPele = mat(cores.pele ?? 0xf1c27d);
   const mBota = mat(cores.botas ?? cores.detalhe);
+  const mCabelo = mat(cores.cabelo ?? 0x1a1a1a);
+  const malha = (geo, m, x = 0, y = 0, z = 0, pai) => {
+    const o = new THREE.Mesh(geo, m);
+    o.position.set(x, y, z);
+    pai.add(o);
+    return o;
+  };
+  const elip = (r, sx, sy, sz, seg = 14) => new THREE.SphereGeometry(r, seg, Math.max(8, (seg * 0.7) | 0)).scale(sx, sy, sz);
+  const tronco = (r1, r2, h, seg = 12) => new THREE.CylinderGeometry(r1, r2, h, seg);
 
   const raiz = new THREE.Group();
   const corpo = new THREE.Group();
@@ -32,91 +43,128 @@ export function criarHumanoide(cores, escala = 1) {
   corpo.rotation.order = 'YXZ';
   raiz.add(corpo);
 
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.36, 4, 12), mUniforme);
-  torso.position.y = 0.36;
-  torso.scale.set(1.2, 1, 0.8);
-  corpo.add(torso);
-  const cinto = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.09, 14), mat(cores.cinto ?? 0xfacc15));
-  cinto.position.y = 0.06;
-  cinto.scale.z = 0.78;
-  corpo.add(cinto);
-  const calcao = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.24, 0.16, 14), mDetalhe);
-  calcao.position.y = -0.05;
-  calcao.scale.z = 0.78;
-  corpo.add(calcao);
+  // quadril, cintura, peito
+  malha(elip(0.2, 1.05, 0.62, 0.78), mDetalhe, 0, -0.02, 0, corpo); // sunga/calção
+  malha(tronco(0.19, 0.17, 0.12).scale(1, 1, 0.75), mat(cores.cinto ?? 0xfacc15), 0, 0.09, 0, corpo); // cinto
+  malha(new THREE.BoxGeometry(0.1, 0.08, 0.03), mat(cores.fivela ?? 0xfff3a0), 0, 0.09, 0.14, corpo); // fivela
+  malha(tronco(0.24, 0.18, 0.3).scale(1, 1, 0.68), mUniforme, 0, 0.28, 0, corpo); // abdômen
+  malha(elip(0.29, 1, 0.78, 0.62), mUniforme, 0, 0.5, 0, corpo); // peito
+  malha(elip(0.12, 1.1, 0.75, 0.55), mUniforme, -0.1, 0.5, 0.09, corpo); // peitoral
+  malha(elip(0.12, 1.1, 0.75, 0.55), mUniforme, 0.1, 0.5, 0.09, corpo);
+  malha(elip(0.11, 1, 0.9, 1), mUniforme, -0.31, 0.6, 0, corpo); // ombros
+  malha(elip(0.11, 1, 0.9, 1), mUniforme, 0.31, 0.6, 0, corpo);
   if (cores.emblema !== undefined) {
-    const emb = new THREE.Mesh(geoEstrela(0.12, 0.05), mat(cores.emblema, { side: THREE.DoubleSide }));
-    emb.position.set(0, 0.46, 0.2);
+    const emb = new THREE.Mesh(geoEstrela(0.11, 0.045), new THREE.MeshToonMaterial({ color: cores.emblema, gradientMap: gradienteToon, side: THREE.DoubleSide }));
+    emb.position.set(0, 0.53, 0.185);
+    emb.rotation.x = -0.12;
+    emb.userData.semContorno = true;
     corpo.add(emb);
   }
+  malha(tronco(0.065, 0.075, 0.14), mPele, 0, 0.73, 0, corpo); // pescoço
 
+  // cabeça
   const cabeca = new THREE.Group();
-  cabeca.position.y = 0.92;
+  cabeca.position.y = 0.9;
   corpo.add(cabeca);
-  const rosto = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), mPele);
-  rosto.scale.set(0.95, 1.08, 1);
-  cabeca.add(rosto);
-  const cabelo = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(cores.cabelo ?? 0x1a1a1a));
-  cabelo.position.set(0, 0.02, -0.02);
-  cabelo.rotation.x = -0.35;
-  cabeca.add(cabelo);
+  malha(elip(0.135, 0.92, 1.12, 1), mPele, 0, 0, 0, cabeca);
+  malha(elip(0.1, 1.05, 0.7, 0.95), mPele, 0, -0.07, 0.03, cabeca); // queixo
+  malha(elip(0.022, 1, 1.3, 1.2, 8), mPele, 0, -0.01, 0.135, cabeca); // nariz
+  for (const x of [-0.13, 0.13]) malha(elip(0.03, 0.6, 1, 0.8, 8), mPele, x, 0, -0.01, cabeca); // orelhas
+  // olhos (branco + pupila) e sobrancelhas
+  const matOlho = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const matPupila = new THREE.MeshBasicMaterial({ color: cores.olho ?? 0x1d3557 });
+  const olhos = [];
+  for (const x of [-0.05, 0.05]) {
+    const o = malha(elip(0.026, 1.2, 0.9, 0.6, 10), matOlho, x, 0.025, 0.118, cabeca);
+    o.userData.semContorno = true;
+    olhos.push(o);
+    const pu = malha(elip(0.012, 1, 1, 0.6, 8), matPupila, x, 0.025, 0.134, cabeca);
+    pu.userData.semContorno = true;
+    const sob = malha(new THREE.BoxGeometry(0.055, 0.012, 0.02), mCabelo, x, 0.065, 0.125, cabeca);
+    sob.rotation.z = x > 0 ? -0.15 : 0.15;
+    sob.userData.semContorno = true;
+  }
+  // cabelo com topete na frente
+  const cab = malha(elip(0.145, 0.98, 0.72, 1.05), mCabelo, 0, 0.06, -0.015, cabeca);
+  cab.rotation.x = -0.2;
+  const topete = malha(elip(0.06, 1.3, 0.8, 1.2, 10), mCabelo, 0.03, 0.12, 0.1, cabeca);
+  topete.rotation.z = -0.4;
   if (cores.mascara) {
-    const masc = new THREE.Mesh(new THREE.CylinderGeometry(0.175, 0.175, 0.07, 14, 1, true), mat(cores.mascara, { side: THREE.DoubleSide }));
-    masc.position.y = 0.02;
+    const masc = new THREE.Mesh(new THREE.CylinderGeometry(0.142, 0.142, 0.06, 18, 1, true), new THREE.MeshToonMaterial({ color: cores.mascara, gradientMap: gradienteToon, side: THREE.DoubleSide }));
+    masc.position.y = 0.025;
+    masc.userData.semContorno = true;
     cabeca.add(masc);
   }
-  const matOlho = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const olhos = [];
-  for (const x of [-0.06, 0.06]) {
-    const o = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6), matOlho);
-    o.position.set(x, 0.02, 0.155);
-    cabeca.add(o);
-    olhos.push(o);
+
+  // braços com cotovelo
+  const bracos = [], antebracos = [];
+  for (const lado of [-1, 1]) {
+    const ombro = new THREE.Group();
+    ombro.position.set(lado * 0.34, 0.58, 0);
+    corpo.add(ombro);
+    malha(tronco(0.08, 0.065, 0.32), mUniforme, 0, -0.16, 0, ombro); // braço
+    const cotovelo = new THREE.Group();
+    cotovelo.position.y = -0.32;
+    ombro.add(cotovelo);
+    malha(new THREE.SphereGeometry(0.065, 10, 8), mUniforme, 0, 0, 0, cotovelo);
+    malha(tronco(0.065, 0.055, 0.2), mUniforme, 0, -0.1, 0, cotovelo); // antebraço
+    malha(tronco(0.075, 0.06, 0.12), mDetalhe, 0, -0.2, 0, cotovelo); // punho da luva
+    malha(elip(0.065, 0.9, 1.2, 0.8), mDetalhe, 0, -0.32, 0.01, cotovelo); // mão
+    bracos.push(ombro);
+    antebracos.push(cotovelo);
+  }
+  // pernas com joelho
+  const pernas = [], canelas = [];
+  for (const lado of [-1, 1]) {
+    const quadril = new THREE.Group();
+    quadril.position.set(lado * 0.12, -0.04, 0);
+    corpo.add(quadril);
+    malha(tronco(0.105, 0.08, 0.46), mUniforme, 0, -0.23, 0, quadril); // coxa
+    const joelho = new THREE.Group();
+    joelho.position.y = -0.46;
+    quadril.add(joelho);
+    malha(new THREE.SphereGeometry(0.08, 10, 8), mUniforme, 0, 0, 0, joelho);
+    malha(tronco(0.08, 0.065, 0.2), mUniforme, 0, -0.1, 0, joelho); // canela
+    malha(tronco(0.095, 0.075, 0.28), mBota, 0, -0.3, 0, joelho); // bota
+    malha(tronco(0.1, 0.1, 0.05), mBota, 0, -0.17, 0, joelho); // borda da bota
+    malha(elip(0.075, 1, 0.55, 1.6), mBota, 0, -0.44, 0.05, joelho); // pé
+    pernas.push(quadril);
+    canelas.push(joelho);
   }
 
-  const membro = (r, comp, m) => {
-    const g = new THREE.Mesh(new THREE.CapsuleGeometry(r, comp, 4, 8), m);
-    g.position.y = -(comp / 2 + r * 0.6);
-    return g;
-  };
-  const bracos = [];
-  for (const lado of [-1, 1]) {
-    const piv = new THREE.Group();
-    piv.position.set(lado * 0.36, 0.6, 0);
-    piv.add(membro(0.075, 0.48, mUniforme));
-    const luva = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), mDetalhe);
-    luva.position.y = -0.66;
-    piv.add(luva);
-    corpo.add(piv);
-    bracos.push(piv);
-  }
-  const pernas = [];
-  for (const lado of [-1, 1]) {
-    const piv = new THREE.Group();
-    piv.position.set(lado * 0.13, -0.02, 0);
-    piv.add(membro(0.1, 0.6, mUniforme));
-    const bota = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.34, 10), mBota);
-    bota.position.y = -0.8;
-    piv.add(bota);
-    corpo.add(piv);
-    pernas.push(piv);
-  }
-
+  // capa
   let capa = null, capaGeo = null, capaBase = null;
   if (cores.capa !== undefined) {
     capa = new THREE.Group();
-    capa.position.set(0, 0.62, -0.19);
-    capaGeo = new THREE.PlaneGeometry(0.66, 1.3, 3, 8);
-    capaGeo.translate(0, -0.65, 0);
+    capa.position.set(0, 0.64, -0.17);
+    capaGeo = new THREE.PlaneGeometry(0.7, 1.35, 4, 10);
+    capaGeo.translate(0, -0.675, 0);
     capaBase = Float32Array.from(capaGeo.attributes.position.array);
-    const m = new THREE.Mesh(capaGeo, mat(cores.capa, { side: THREE.DoubleSide, roughness: 0.8, metalness: 0 }));
+    const m = new THREE.Mesh(capaGeo, new THREE.MeshToonMaterial({ color: cores.capa, gradientMap: gradienteToon, side: THREE.DoubleSide }));
+    m.userData.semContorno = true;
     capa.add(m);
     corpo.add(capa);
+    // presilhas da capa nos ombros
+    for (const x of [-0.2, 0.2]) malha(new THREE.SphereGeometry(0.04, 8, 6), mat(cores.cinto ?? 0xfacc15), x, 0.66, -0.12, corpo);
   }
 
-  raiz.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+  raiz.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  adicionarContornoBoneco(raiz);
   raiz.scale.setScalar(escala);
-  return { raiz, corpo, cabeca, olhos, matOlho, bracoE: bracos[0], bracoD: bracos[1], pernaE: pernas[0], pernaD: pernas[1], capa, capaGeo, capaBase, t: 0 };
+  return {
+    raiz, corpo, cabeca, olhos, matOlho, bracoE: bracos[0], bracoD: bracos[1], antebracoE: antebracos[0], antebracoD: antebracos[1],
+    pernaE: pernas[0], pernaD: pernas[1], canelaE: canelas[0], canelaD: canelas[1], capa, capaGeo, capaBase, t: 0,
+  };
+}
+
+function adicionarContornoBoneco(raiz) {
+  const malhas = [];
+  raiz.traverse((o) => { if (o.isMesh && !o.userData.semContorno && !o.userData.contorno) malhas.push(o); });
+  for (const m of malhas) {
+    const c = new THREE.Mesh(m.geometry, materialContorno(0.014));
+    c.userData.contorno = true;
+    m.add(c);
+  }
 }
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -154,6 +202,24 @@ export function animarHumanoide(rig, e) {
   if (e.segurando) { bEx = bDx = -1.45; bEz = -0.15; bDz = 0.15; }
   if (e.soco > 0) { const s = Math.sin(e.soco * Math.PI); bDx = lerp(bDx, -1.6, s); bDz = lerp(bDz, 0.1, s); }
 
+  // dobra dos cotovelos e joelhos
+  let cE = -0.25, cD = -0.25, jE = 0.05, jD = 0.05;
+  if (e.voando) {
+    cD = e.rapidez > 0.35 ? 0 : -0.35;
+    cE = -0.3;
+    jE = 0.2 + Math.sin(t * 2.2) * 0.05; jD = 0.45 + Math.sin(t * 2.2 + 1) * 0.05;
+  } else if (e.andar > 0.5) {
+    jE = Math.max(0, pE) * 1.3 + 0.1; jD = Math.max(0, pD) * 1.3 + 0.1;
+    cE = cD = -0.45 - Math.min(0.6, e.andar * 0.03);
+  }
+  if (e.segurando) cE = cD = -0.5;
+  if (e.soco > 0) cD = lerp(cD, 0, Math.sin(e.soco * Math.PI));
+  if (rig.antebracoE) {
+    rig.antebracoE.rotation.x = lerp(rig.antebracoE.rotation.x, cE, k);
+    rig.antebracoD.rotation.x = lerp(rig.antebracoD.rotation.x, cD, e.soco > 0 ? 1 : k);
+    rig.canelaE.rotation.x = lerp(rig.canelaE.rotation.x, jE, k);
+    rig.canelaD.rotation.x = lerp(rig.canelaD.rotation.x, jD, k);
+  }
   rig.bracoE.rotation.x = lerp(rig.bracoE.rotation.x, bEx, k);
   rig.bracoE.rotation.z = lerp(rig.bracoE.rotation.z, bEz, k);
   rig.bracoD.rotation.x = lerp(rig.bracoD.rotation.x, bDx, e.soco > 0 ? 1 : k);
@@ -165,7 +231,9 @@ export function animarHumanoide(rig, e) {
   // capa balançando
   if (rig.capa) {
     const r = e.voando ? e.rapidez : Math.min(1, e.andar / 30);
-    rig.capa.rotation.x = lerp(rig.capa.rotation.x, 0.12 + r * 1.25 + (e.voando ? 0.15 : 0), Math.min(1, dt * 4));
+    // a capa abre para trás pela velocidade, menos o quanto o corpo já está deitado no voo
+    const abertura = Math.max(0.1, 0.12 + r * 1.3 - (e.inclinacao || 0) * 0.95);
+    rig.capa.rotation.x = lerp(rig.capa.rotation.x, abertura, Math.min(1, dt * 4));
     const pos = rig.capaGeo.attributes.position;
     const base = rig.capaBase;
     const freq = 5 + r * 16;

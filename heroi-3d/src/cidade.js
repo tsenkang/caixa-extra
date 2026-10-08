@@ -338,6 +338,8 @@ function montarAltos(predios, q) {
     const parede = new THREE.Color(corParede), detalhe = new THREE.Color(corDetalhe);
     const vidro = new THREE.Color(aleatorio([0xffffff, 0xd8f0e8, 0xe8e0ff, 0xd0e4ff]));
     const borda = (i, k) => i === nx - 1 || k === nz - 1;
+    const toldo = new THREE.Color(aleatorio([0xff9a9a, 0x9be0a8, 0x9cc2ff, 0xffe08a, 0xffb36b, 0xffffff]));
+    const tijolo = new THREE.Color(aleatorio([0xffffff, 0xf2e6da, 0xe6d6c8, 0xd8d8d8]));
     predios.criarPredio({
       x: q.cx + ox, z: q.cz + oz, nx, ny: ny + (casaMaquinas ? 1 : 0), nz, tx: 3, ty: 3.2, tz: 3,
       nome: alto ? 'arranha-céu' : 'prédio',
@@ -349,9 +351,10 @@ function montarAltos(predios, q) {
         const t = interior(i, j, k, j >= recuo ? nx - 1 : nx, j >= recuo ? nz - 1 : nz);
         if (t >= 0) return t;
         const quina = (i === 0 || i === nx - 1) && (k === 0 || k === nz - 1);
-        if (estilo === 'vidro') return j === 0 ? 1 : quina ? 2 : 4;
-        if (estilo === 'residencial') return j > 0 && Math.random() < 0.35 ? 3 : 1;
-        return j > 0 && Math.random() < 0.12 ? 3 : 1;
+        if (estilo === 'vidro') return j === 0 ? 4 : quina ? 2 : 4; // térreo = saguão de vidro
+        if (j === 0) return 8; // lojas no térreo
+        if (estilo === 'residencial') return Math.random() < 0.35 ? 3 : 1;
+        return quina ? 2 : 7; // tijolinho com quinas de pedra
       },
       corCelula: (i, j, k, t) => {
         if (t === 5) return (i + k + j) % 2 ? 0xc8a982 : 0xbb9a72; // piso de madeira
@@ -362,7 +365,9 @@ function montarAltos(predios, q) {
           return (i + k) % 2 ? 0x8a8c91 : 0x9a9ca1;
         }
         if (t === 4) return vidro;
-        if (j === 0) return 0x56616c; // térreo com lojas
+        if (t === 8) return toldo; // cor do toldo da loja
+        if (t === 7) return tijolo;
+        if (j === 0) return 0x56616c;
         const quina = (i === 0 || i === nx - 1) && (k === 0 || k === nz - 1);
         if (quina || j === ny - 2 || j === recuo - 1) return detalhe;
         return parede;

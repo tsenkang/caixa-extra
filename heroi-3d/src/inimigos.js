@@ -356,7 +356,7 @@ export class HeroiInimigo extends Entidade {
     const rig = criarHumanoide(cfg.cores, cfg.escala);
     super(jogo, rig.raiz, {
       tipo: 'heroiInimigo', raio: 0.7 * cfg.escala, altura: 2.1 * cfg.escala, vida: cfg.vida,
-      massa: tipo === 'gigante' ? 20 : 1.5, agarravel: tipo !== 'gigante', inimigo: true,
+      massa: tipo === 'gigante' ? 20 : 1.5, agarravel: tipo !== 'gigante', inimigo: true, contorno: 0,
     });
     this.rig = rig;
     this.variante = tipo;

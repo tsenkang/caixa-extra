@@ -184,3 +184,89 @@ export function texturaVidro() {
   ctx.fillRect(0, t - 10, t, 1);
   return finalizar(c);
 }
+
+// sombreado que dá profundidade: borda de cima clara e de baixo escura + sombra dentro da moldura
+function profundidade(ctx, t, jx, jy, jw, jh) {
+  const g = ctx.createLinearGradient(0, 0, 0, t);
+  g.addColorStop(0, 'rgba(255,255,255,0.10)');
+  g.addColorStop(0.85, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.18)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, t, t);
+  if (jw) {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(jx, jy, jw, 5); // sombra da verga
+    ctx.fillRect(jx, jy, 4, jh); // sombra lateral
+  }
+}
+
+// parede de tijolinho com janela, verga e peitoril de pedra
+export function texturaTijolo() {
+  const t = 128;
+  const [c, ctx] = canvas(t);
+  ctx.fillStyle = '#d9d2c8';
+  ctx.fillRect(0, 0, t, t);
+  const cores = ['#a5533b', '#b0603f', '#9a4a35', '#b86a48', '#8f4632'];
+  for (let y = 0, linha = 0; y < t; y += 8, linha++) {
+    for (let x = linha % 2 ? -8 : 0; x < t; x += 16) {
+      ctx.fillStyle = cores[(Math.random() * cores.length) | 0];
+      ctx.fillRect(x + 1, y + 1, 14, 6);
+    }
+  }
+  ruido(ctx, t, 18);
+  // janela
+  ctx.fillStyle = '#ece6dc';
+  ctx.fillRect(26, 18, 76, 4); // verga
+  ctx.fillRect(22, 92, 84, 6); // peitoril
+  ctx.fillStyle = '#f2efe8';
+  ctx.fillRect(30, 22, 68, 70);
+  const g = ctx.createLinearGradient(0, 24, 0, 90);
+  g.addColorStop(0, '#a9cfe8'); g.addColorStop(0.5, '#5d89b0'); g.addColorStop(1, '#23405c');
+  ctx.fillStyle = g;
+  ctx.fillRect(34, 26, 60, 62);
+  ctx.fillStyle = '#f2efe8';
+  ctx.fillRect(62, 26, 4, 62);
+  ctx.fillRect(34, 52, 60, 3);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.beginPath(); ctx.moveTo(36, 86); ctx.lineTo(58, 28); ctx.lineTo(66, 28); ctx.lineTo(44, 86); ctx.fill();
+  profundidade(ctx, t, 34, 26, 60, 62);
+  return finalizar(c);
+}
+
+// térreo com loja: vitrine, porta, toldo e letreiro (a cor do toldo vem da cor do bloco)
+export function texturaLoja() {
+  const t = 128;
+  const [c, ctx] = canvas(t);
+  ctx.fillStyle = '#e8e4dc';
+  ctx.fillRect(0, 0, t, t);
+  ruido(ctx, t, 10);
+  // letreiro
+  ctx.fillStyle = '#2b2f36';
+  ctx.fillRect(6, 6, 116, 16);
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 6; i++) ctx.fillRect(14 + i * 17, 11, 10, 6);
+  // toldo listrado
+  for (let x = 0; x < t; x += 16) {
+    ctx.fillStyle = (x / 16) % 2 ? '#ffffff' : '#c8c8c8';
+    ctx.beginPath(); ctx.moveTo(x, 24); ctx.lineTo(x + 16, 24); ctx.lineTo(x + 16, 38); ctx.lineTo(x, 42); ctx.fill();
+  }
+  // vitrine e porta
+  const g = ctx.createLinearGradient(0, 44, 0, 120);
+  g.addColorStop(0, '#9cc3dc'); g.addColorStop(1, '#2c4660');
+  ctx.fillStyle = g;
+  ctx.fillRect(8, 46, 70, 66);
+  ctx.fillStyle = '#3a2c22';
+  ctx.fillRect(86, 46, 32, 74);
+  ctx.fillStyle = '#7fa7c4';
+  ctx.fillRect(90, 52, 24, 34);
+  ctx.fillStyle = '#d8c070';
+  ctx.fillRect(108, 90, 4, 4); // maçaneta
+  // produtos na vitrine
+  for (let i = 0; i < 5; i++) { ctx.fillStyle = ['#e45b5b', '#f2c14e', '#5bb08a', '#6b8fd6', '#d97ab8'][i]; ctx.fillRect(14 + i * 12, 92, 8, 18); }
+  ctx.fillStyle = '#5e5850';
+  ctx.fillRect(6, 112, 74, 4);
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath(); ctx.moveTo(12, 110); ctx.lineTo(40, 48); ctx.lineTo(52, 48); ctx.lineTo(24, 110); ctx.fill();
+  profundidade(ctx, t, 8, 46, 70, 66);
+  return finalizar(c);
+}

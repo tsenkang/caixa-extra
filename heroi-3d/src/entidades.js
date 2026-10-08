@@ -2,7 +2,7 @@
 // Também tem a rede de ruas usada pelos veículos.
 import * as THREE from 'three';
 import { RUAS_X, RUAS_Z, FAIXA, FIM_X, FIM_Z, QUARTEIROES, CALCADA } from './cidade.js';
-import { materialCores, materialQueimado, geoPessoa, geoCarro, geoBomba } from './modelos.js';
+import { materialCores, materialQueimado, geoPessoa, geoCarro, geoBomba, adicionarContorno } from './modelos.js';
 
 const _v = new THREE.Vector3();
 const _c = new THREE.Vector3();
@@ -64,6 +64,8 @@ export class Entidade {
     this.podeVoarMorto = true;
     this.voandoMorto = false;
     objeto.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+    // contorno preto de desenho (os heróis já vêm com o deles)
+    if (op.contorno !== 0) adicionarContorno(objeto, op.contorno ?? (this.raio > 1.5 ? 0.05 : 0.022));
     jogo.cena.add(objeto);
   }
 
@@ -365,7 +367,7 @@ export class Veiculo extends Entidade {
     if (this.estado === 'morto') return;
     this.estado = 'morto';
     this.tempoEstado = 0;
-    this.obj.traverse((o) => { if (o.isMesh) o.material = materialQueimado; });
+    this.obj.traverse((o) => { if (o.isMesh && !o.userData.contorno) o.material = materialQueimado; });
     this.centro(_c);
     this.jogo.explosao(_c, 5 + this.massa, 60, origem, this);
   }

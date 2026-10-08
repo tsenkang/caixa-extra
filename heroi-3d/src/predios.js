@@ -3,11 +3,11 @@
 // Todos os blocos da cidade são desenhados com 2 InstancedMesh (paredes com janela e blocos lisos).
 // Quando um bloco quebra, a instância some e nasce um pedaço com física (detritos.js).
 import * as THREE from 'three';
-import { texturaJanela, texturaConcreto, texturaJanelaAcesa, texturaVidro } from './texturas.js';
+import { texturaJanela, texturaConcreto, texturaJanelaAcesa, texturaVidro, texturaTijolo, texturaLoja } from './texturas.js';
 
 const HP_BLOCO = 30;
 const ESP = 0.4; // espessura das lajes e rampas (interior dos prédios)
-// valores da função "forma": 1 parede, 2 liso, 3 janela acesa, 4 vidro, 5 laje (piso fino), 6 rampa (sobe em +z)
+// valores da função "forma": 1 parede, 2 liso, 3 janela acesa, 4 vidro, 5 laje (piso fino), 6 rampa (sobe em +z), 7 tijolo, 8 loja
 const _e = new THREE.Euler();
 const MAX_QUEDA_POR_QUADRO = 160; // quantos blocos soltos viram pedaços por quadro
 
@@ -35,6 +35,8 @@ export class SistemaPredios {
       new THREE.MeshLambertMaterial({ map: texturaConcreto() }),
       new THREE.MeshLambertMaterial({ map: texturaJanelaAcesa() }),
       new THREE.MeshPhongMaterial({ map: texturaVidro(), shininess: 90, specular: 0x8899aa }),
+      new THREE.MeshLambertMaterial({ map: texturaTijolo() }),
+      new THREE.MeshLambertMaterial({ map: texturaLoja() }),
     ];
     this.atualizarMalha = this.materiais.map(() => false);
     this._fila = new Int32Array(4096);
@@ -71,7 +73,7 @@ export class SistemaPredios {
           const t = op.forma ? op.forma(i, j, k) : (j === ny - 1 ? 2 : 1);
           if (!t) continue;
           p.tipo[idx] = 1;
-          p.malha[idx] = t >= 5 ? 2 : t;
+          p.malha[idx] = t === 5 || t === 6 ? 2 : t >= 7 ? t - 2 : t;
           p.formato[idx] = t === 5 ? 1 : t === 6 ? 2 : 0;
           p.hp[idx] = HP_BLOCO * (op.resistencia ?? 1);
           if (op.corCelula) _c.set(op.corCelula(i, j, k, t));
