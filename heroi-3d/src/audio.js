@@ -142,6 +142,19 @@ export class Audio {
   raioAzul(ligado) {
     if (ligado) this.tom({ freq: 900, freqFim: 300, dur: 2.2, volume: 0.25, forma: 'sawtooth' });
   }
+  // rugido do Godzilla (grave e longo)
+  rugido(f = 1) {
+    this.tocarRuido({ dur: 2.4 * f, freq: 520, freqFim: 160, tipo: 'lowpass', q: 4, volume: 0.9, ataque: 0.2 });
+    this.tom({ freq: 150, freqFim: 48, dur: 2.3 * f, volume: 0.45, forma: 'sawtooth' });
+    this.tom({ freq: 230, freqFim: 80, dur: 1.9 * f, volume: 0.22, forma: 'square' });
+  }
+  soproAtomico(disparo) {
+    if (!disparo) this.tom({ freq: 60, freqFim: 700, dur: 2, volume: 0.22, forma: 'sawtooth' });
+    else {
+      this.tocarRuido({ dur: 3.6, freq: 2200, freqFim: 500, tipo: 'bandpass', q: 0.7, volume: 0.7, ataque: 0.05 });
+      this.tom({ freq: 320, freqFim: 110, dur: 3.4, volume: 0.3, forma: 'sawtooth' });
+    }
+  }
   pegar() { this.tom({ freq: 300, freqFim: 150, dur: 0.15, volume: 0.3, forma: 'triangle' }); }
   arremesso() { this.tocarRuido({ dur: 0.5, freq: 600, freqFim: 2500, tipo: 'bandpass', q: 1.5, volume: 0.6 }); }
 

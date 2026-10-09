@@ -94,6 +94,11 @@ export function criarHumanoide(cores, escala = 1) {
   malha(elip(0.1, 1.05, 0.7, 0.95), mPele, 0, -0.07, 0.03, cabeca); // queixo
   malha(elip(0.022, 1, 1.3, 1.2, 8), mPele, 0, -0.01, 0.135, cabeca); // nariz
   for (const x of [-0.13, 0.13]) malha(elip(0.03, 0.6, 1, 0.8, 8), mPele, x, 0, -0.01, cabeca); // orelhas
+  if (cores.bigode !== undefined) {
+    // bigode grosso (o Viltrumita)
+    const big = malha(elip(0.05, 1.5, 0.45, 0.6, 10), mat(cores.bigode), 0, -0.045, 0.128, cabeca);
+    big.userData.semContorno = true;
+  }
   // olhos (branco + pupila) e sobrancelhas
   const matOlho = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const matPupila = new THREE.MeshBasicMaterial({ color: cores.olho ?? 0x1d3557 });

@@ -21,6 +21,8 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { PassoContorno, prepararProfundidade } from './posprocessamento.js';
+import { Fases, FASES, faseLiberada } from './fases.js';
+import { Godzilla } from './godzilla.js';
 
 // ajuste de cor final: um pouco mais de saturação e contraste + vinheta nas bordas
 const CorFinal = {
@@ -91,6 +93,7 @@ class Jogo {
     this.stats = { inimigos: 0, pessoas: 0 };
     this.projeteis = new Projeteis(this);
     this.alerta = new Alerta(this);
+    this.fases = new Fases(this);
     this.controles.aoPerderTrava = () => { if (!this.acabou && !this.pausado) this.pausar(); };
 
     // brilho (bloom) no laser, explosões e faíscas
@@ -128,7 +131,7 @@ class Jogo {
   // ---------- ganchos chamados pelos sistemas ----------
   aoQuebrarBloco(p) { if (p.origem === 'heroi') this.alerta?.adicionar(1); }
   aoNocautear() { this.stats.pessoas++; this.alerta.adicionar(8); }
-  aoInimigoDerrotado(e) { this.stats.inimigos++; this.alerta.adicionar(6); }
+  aoInimigoDerrotado(e) { this.stats.inimigos++; this.alerta.adicionar(6); this.fases.aoDerrotar(e); }
   aoDestruirPredio(p) {
     if (p.origem === 'heroi') this.alerta.adicionar(25);
     this.hud.mensagem(p.nome === 'casa' ? 'CASA DESTRUÍDA!' : 'PRÉDIO DESTRUÍDO!', '#fbbf24');
@@ -220,6 +223,7 @@ class Jogo {
     this.populacao.atualizar(dt);
     this.projeteis.atualizar(dt);
     this.alerta.atualizar(dt);
+    this.fases.atualizar(dt);
     for (let i = this.perigos.length - 1; i >= 0; i--) if ((this.perigos[i].tempo -= dt) <= 0) this.perigos.splice(i, 1);
 
     this.predios.atualizar(dt);
@@ -262,10 +266,25 @@ class Jogo {
       this.pausado = true;
       this.audio?.laser(false);
       document.exitPointerLock?.();
+      document.getElementById('fim-titulo').textContent = 'VOCÊ CAIU!';
+      document.getElementById('btn-tentar').classList.remove('escondido');
       document.getElementById('fim-texto').innerHTML =
-        `Prédios destruídos: <b>${this.predios.destruidos}</b><br>Inimigos derrotados: <b>${this.stats.inimigos}</b><br>Blocos quebrados: <b>${this.predios.blocosQuebrados}</b><br>Alerta máximo: <b>${'★'.repeat(this.alertaMax || 0) || '-'}</b>`;
+        `Fase: <b>${this.fases.atual + 1} · ${FASES[this.fases.atual].titulo}</b><br>Prédios destruídos: <b>${this.predios.destruidos}</b><br>Inimigos derrotados: <b>${this.stats.inimigos}</b><br>Blocos quebrados: <b>${this.predios.blocosQuebrados}</b><br>Alerta máximo: <b>${'★'.repeat(this.alertaMax || 0) || '-'}</b>`;
       document.getElementById('fim').classList.remove('escondido');
     }, 2600);
+  }
+
+  // derrotou o Godzilla: fim do jogo com vitória
+  vitoriaFinal() {
+    this.acabou = true;
+    this.pausado = true;
+    this.audio?.laser(false);
+    document.exitPointerLock?.();
+    document.getElementById('fim-titulo').textContent = 'VOCÊ VENCEU!';
+    document.getElementById('btn-tentar').classList.add('escondido');
+    document.getElementById('fim-texto').innerHTML =
+      `O rei dos monstros caiu. A cidade (o que sobrou dela) está salva!<br><br>Prédios destruídos: <b>${this.predios.destruidos}</b><br>Inimigos derrotados: <b>${this.stats.inimigos}</b><br>Blocos quebrados: <b>${this.predios.blocosQuebrados}</b>`;
+    document.getElementById('fim').classList.remove('escondido');
   }
 
   comecar() {
@@ -280,6 +299,7 @@ class Jogo {
       document.documentElement.requestFullscreen?.().then(() => navigator.keyboard?.lock?.()).catch(() => {});
     }
     try { this.audio = this.audio || Audio.protegido(new Audio(this)); this.audio.ctx.resume(); } catch { this.audio = null; }
+    this.fases.comecar(Number(document.getElementById('op-fase').value) || 0);
     document.getElementById('menu').classList.add('escondido');
     document.getElementById('hud').classList.remove('escondido');
     this.pausado = false;
@@ -290,6 +310,23 @@ class Jogo {
 const jogo = new Jogo();
 window.jogo = jogo; // ajuda nos testes pelo console
 window.Inimigos = Inimigos;
+window.Godzilla = Godzilla;
+// lista de fases liberadas no menu
+const selFase = document.getElementById('op-fase');
+let inicio = 0;
+try { inicio = Number(sessionStorage.getItem('heroi-fase-inicio')) || 0; sessionStorage.removeItem('heroi-fase-inicio'); } catch { /* sem armazenamento */ }
+FASES.forEach((f, i) => {
+  const o = document.createElement('option');
+  o.value = i;
+  o.textContent = `${i + 1}. ${f.titulo}${i > faseLiberada() ? ' 🔒' : ''}`;
+  o.disabled = i > faseLiberada();
+  selFase.appendChild(o);
+});
+selFase.value = String(Math.min(inicio, faseLiberada()));
+document.getElementById('btn-tentar').addEventListener('click', () => {
+  try { sessionStorage.setItem('heroi-fase-inicio', String(jogo.fases.atual)); } catch { /* sem armazenamento */ }
+  location.reload();
+});
 const btn = document.getElementById('btn-jogar');
 document.getElementById('carregando').textContent = '';
 btn.addEventListener('click', () => jogo.comecar());

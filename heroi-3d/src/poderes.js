@@ -38,13 +38,18 @@ export class Mira {
     const minimo = o.distanceTo(jogo.heroi.pos) - 0.5;
     for (const e of jogo.entidades) {
       if (e.remover || e.estado === 'preso') continue;
-      e.centro(_c);
-      _v.subVectors(_c, o);
-      const t = _v.dot(d);
-      if (t < minimo || t > melhor) continue;
-      const perp2 = _v.lengthSq() - t * t;
-      const r = e.raio + 0.3;
-      if (perp2 < r * r) { melhor = t; this.tipo = 'entidade'; this.entidade = e; this.normal.copy(d).negate(); }
+      // monstros grandes têm várias esferas de acerto (corpo, cabeça, pernas, cauda)
+      const esferas = e.esferas || null;
+      const n = esferas ? esferas.length : 1;
+      for (let i = 0; i < n; i++) {
+        if (esferas) _c.copy(esferas[i].c); else e.centro(_c);
+        _v.subVectors(_c, o);
+        const t = _v.dot(d);
+        if (t < minimo || t > melhor) continue;
+        const perp2 = _v.lengthSq() - t * t;
+        const r = (esferas ? esferas[i].r : e.raio) + 0.3;
+        if (perp2 < r * r) { melhor = t; this.tipo = 'entidade'; this.entidade = e; this.normal.copy(d).negate(); }
+      }
     }
     this.dist = melhor;
     this.ponto.copy(o).addScaledVector(d, melhor);

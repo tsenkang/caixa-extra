@@ -68,3 +68,16 @@ button:disabled { opacity: 0.4; cursor: wait; }
 button.secundario { background: linear-gradient(180deg, #3b82f6, #1d4ed8); font-size: 16px; }
 #carregando { font-size: 12px; opacity: 0.6; margin-top: 8px; }
 #fim-texto { font-size: 17px; line-height: 1.6; margin-bottom: 8px; }
+
+/* fases */
+#fase-hud { position: absolute; left: 24px; top: 30px; text-shadow: 0 1px 3px #000; }
+#fase-hud b { display: block; font-size: 15px; letter-spacing: 2px; color: #fde68a; }
+#fase-hud span { font-size: 14px; opacity: 0.9; }
+#titulo-fase { position: fixed; top: 22%; width: 100%; text-align: center; pointer-events: none; opacity: 0; text-shadow: 0 3px 12px #000; }
+#titulo-fase.anim { animation: tituloFase 3.4s ease-out forwards; }
+#titulo-fase .topo { font-size: 20px; font-weight: 800; letter-spacing: 8px; opacity: 0.85; }
+#titulo-fase .grande { font-size: 72px; font-weight: 900; letter-spacing: 6px; font-style: italic; -webkit-text-stroke: 2px #000; }
+#titulo-fase .baixo { font-size: 18px; letter-spacing: 2px; opacity: 0.9; }
+@keyframes tituloFase { 0% { opacity: 0; transform: scale(1.4); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(0.97); } }
+#op-fase { margin-left: 6px; padding: 3px 6px; border-radius: 6px; background: #0f172a; color: #fff; border: 1px solid #3b82f6; font: inherit; }
+@media (max-width: 600px) { #titulo-fase .grande { font-size: 44px; } }

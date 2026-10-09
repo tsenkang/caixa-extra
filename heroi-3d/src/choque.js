@@ -58,7 +58,7 @@ export class ChoqueDeRaios {
     let alvo = null;
     if (laser.ativo && this.espera <= 0) {
       for (const e of jogo.entidades) {
-        if (e.variante !== 'raio' || e.estado !== 'normal' || !e.feixe?.ativo) continue;
+        if (!e.raio3d || e.estado !== 'normal' || !e.feixe?.ativo) continue; // Voltagem ou o sopro do Godzilla
         const d = maisProximos(laser.inicio, laser.fim, e.feixe.a, e.feixe.b, _p, _q);
         if (d < DISTANCIA_CHOQUE) { alvo = e; break; }
       }
@@ -167,7 +167,8 @@ export class ChoqueDeRaios {
       const d = _q.distanceTo(p);
       if (d > 90) continue;
       const f = 1 - d / 90;
-      e.levarDano((e === inimigo ? 260 : 200) * f + (e === inimigo ? 60 : 0), 'heroi');
+      if (e === inimigo && e.danoDireto) e.danoDireto(e.danoChoque * (0.5 + f * 0.5)); // o Godzilla sente muito o choque
+      else e.levarDano((e === inimigo ? 260 : 200) * f + (e === inimigo ? 60 : 0), 'heroi');
       _v.subVectors(_q, p).normalize().multiplyScalar(120 * f / Math.sqrt(Math.max(1, e.massa * 0.5))).y += 20 * f;
       if (e.estado === 'preso') continue;
       e.lancar(_v, true);
