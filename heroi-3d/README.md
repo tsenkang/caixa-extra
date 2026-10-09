@@ -15,6 +15,8 @@ Botão esquerdo laser · Botão direito segurar = pegar / soltar = arremessar ·
 ## O que tem no jogo
 - Cidade com 12 quarteirões: prédios altos (10 a 25 andares), casas, praça com chafariz, posto (as bombas explodem!).
 - Prédios feitos de blocos: laser, soco, carros arremessados e explosões quebram blocos; se a base cair, o prédio desaba.
+- Animações: o herói respira parado e depois faz a pose heroica (mãos na cintura, olhando em volta); anda e corre com o corpo balançando; voa inclinando nas curvas como um avião; soca puxando o braço e girando o tronco (e fica em guarda); pousa agachado, ou na "pose de super-herói" (joelho e punho no chão, com onda de choque) se vier rápido; se debate quando é arremessado; pisca. A capa ondula e balança nas curvas. O Corisco corre no ar, o Colosso anda pesado balançando, o Viltrumita alterna os braços nos socos, o Godzilla se encolhe com golpes fortes e as pessoas correm inclinadas com medo.
+- Personagens com músculos (bíceps, coxas, panturrilhas), boca, brilho nos olhos e luz de contorno nas bordas (como em animação).
 - Destruição com material de verdade: blocos inteiros caem com a cara do prédio; batidas soltam pedras de concreto, vergalhões de ferro torcidos, tijolos soltos e cacos de vidro (que brilham, tilintam no chão e somem mais rápido).
 - O jogo tem 6 fases: 1) O Exército (derrote 12 inimigos), 2) Voltagem (raio azul), 3) Corisco (super rápido), 4) Colosso (gigante), 5) O Viltrumita (penúltimo chefe: combos, agarrão e "pinball" pelos prédios), 6) GODZILLA (chefe final: sopro atômico, giro de cauda, pisão, mordida e rugido).
 - Entre as fases a vida enche. No menu ("Começar na fase") dá para escolher qualquer fase, e ao cair dá para tentar a mesma fase de novo.

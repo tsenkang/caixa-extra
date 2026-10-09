@@ -28,10 +28,25 @@ function geoRaioEmblema(t) {
   return new THREE.ShapeGeometry(s);
 }
 
+// material dos personagens: sombreado de desenho + luz de contorno (brilho fino nas bordas, como em animação)
+export function materialBoneco(cor, op = {}) {
+  const m = new THREE.MeshToonMaterial({ color: cor, gradientMap: gradienteToon, ...op });
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
+      {
+        float borda = 1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0);
+        outgoingLight += (diffuseColor.rgb * 0.55 + 0.22) * smoothstep(0.6, 0.76, borda) * 0.5;
+      }
+      #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => 'boneco-borda';
+  return m;
+}
+
 // boneco articulado (usado pelo herói e pelos heróis inimigos)
 // proporções de "herói de desenho": ombros largos, cintura fina, cotovelos e joelhos articulados
 export function criarHumanoide(cores, escala = 1) {
-  const mat = (c) => new THREE.MeshToonMaterial({ color: c, gradientMap: gradienteToon });
+  const mat = (c) => materialBoneco(c);
   // físico: multiplicadores de ombros, braços, pernas e cabeça (o Colosso é bem mais forte)
   const fis = { ombros: 1, bracos: 1, pernas: 1, cabeca: 1, ...(cores.fisico || {}) };
   const O = fis.ombros, B = fis.bracos, P = fis.pernas;
@@ -102,17 +117,28 @@ export function criarHumanoide(cores, escala = 1) {
   // olhos (branco + pupila) e sobrancelhas
   const matOlho = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const matPupila = new THREE.MeshBasicMaterial({ color: cores.olho ?? 0x1d3557 });
-  const olhos = [];
+  const olhos = [], olhosG = [];
+  const matBrilhoOlho = new THREE.MeshBasicMaterial({ color: 0xffffff });
   for (const x of [-0.05, 0.05]) {
-    const o = malha(elip(0.026, 1.2, 0.9, 0.6, 10), matOlho, x, 0.025, 0.118, cabeca);
+    // cada olho fica num grupo (para piscar)
+    const g = new THREE.Group();
+    g.position.set(x, 0.025, 0.118);
+    cabeca.add(g);
+    olhosG.push(g);
+    const o = malha(elip(0.026, 1.2, 0.9, 0.6, 10), matOlho, 0, 0, 0, g);
     o.userData.semContorno = true;
     olhos.push(o);
-    const pu = malha(elip(0.012, 1, 1, 0.6, 8), matPupila, x, 0.025, 0.134, cabeca);
+    const pu = malha(elip(0.012, 1, 1, 0.6, 8), matPupila, 0, 0, 0.016, g);
     pu.userData.semContorno = true;
+    const br = malha(new THREE.SphereGeometry(0.0045, 6, 4), matBrilhoOlho, 0.005, 0.006, 0.022, g); // brilhinho no olho
+    br.userData.semContorno = true;
     const sob = malha(new THREE.BoxGeometry(0.055, 0.012, 0.02), mCabelo, x, 0.065, 0.125, cabeca);
     sob.rotation.z = x > 0 ? -0.15 : 0.15;
     sob.userData.semContorno = true;
   }
+  // boca (traço) e queixo marcado
+  const boca = malha(new THREE.BoxGeometry(0.045, 0.007, 0.01), new THREE.MeshBasicMaterial({ color: 0x5a2a22 }), 0, -0.075, 0.122, cabeca);
+  boca.userData.semContorno = true;
   // cabelo com topete na frente
   const cab = malha(elip(0.145, 0.98, 0.72, 1.05), mCabelo, 0, 0.06, -0.015, cabeca);
   cab.rotation.x = -0.2;
@@ -132,6 +158,7 @@ export function criarHumanoide(cores, escala = 1) {
     ombro.position.set(lado * 0.34 * O, 0.58, 0);
     corpo.add(ombro);
     malha(tronco(0.08 * B, 0.065 * B, 0.32), mBraco, 0, -0.16, 0, ombro); // braço
+    malha(elip(0.07 * B, 1, 1.6, 1.05), mBraco, 0, -0.13, 0.025, ombro); // bíceps
     const cotovelo = new THREE.Group();
     cotovelo.position.y = -0.32;
     ombro.add(cotovelo);
@@ -149,11 +176,13 @@ export function criarHumanoide(cores, escala = 1) {
     quadril.position.set(lado * 0.12, -0.04, 0);
     corpo.add(quadril);
     malha(tronco(0.105 * P, 0.08 * P, 0.46), mUniforme, 0, -0.23, 0, quadril); // coxa
+    malha(elip(0.095 * P, 1, 2, 1.05), mUniforme, 0, -0.2, 0.02, quadril); // músculo da coxa
     const joelho = new THREE.Group();
     joelho.position.y = -0.46;
     quadril.add(joelho);
     malha(new THREE.SphereGeometry(0.08 * P, 10, 8), mUniforme, 0, 0, 0, joelho);
     malha(tronco(0.08 * P, 0.065 * P, 0.2), mUniforme, 0, -0.1, 0, joelho); // canela
+    malha(elip(0.07 * P, 1, 1.5, 1.1), mUniforme, 0, -0.08, -0.025, joelho); // panturrilha
     malha(tronco(0.095 * P, 0.075 * P, 0.28), mBota, 0, -0.3, 0, joelho); // bota
     malha(tronco(0.1 * P, 0.1 * P, 0.05), mBota, 0, -0.17, 0, joelho); // borda da bota
     malha(elip(0.075, 1, 0.55, 1.6), mBota, 0, -0.44, 0.05, joelho); // pé
@@ -165,11 +194,12 @@ export function criarHumanoide(cores, escala = 1) {
   let capa = null, capaGeo = null, capaBase = null;
   if (cores.capa !== undefined) {
     capa = new THREE.Group();
+    capa.rotation.order = 'ZXY';
     capa.position.set(0, 0.64, -0.17);
-    capaGeo = new THREE.PlaneGeometry(0.7, 1.35, 4, 10);
+    capaGeo = new THREE.PlaneGeometry(0.7, 1.35, 6, 12);
     capaGeo.translate(0, -0.675, 0);
     capaBase = Float32Array.from(capaGeo.attributes.position.array);
-    const m = new THREE.Mesh(capaGeo, new THREE.MeshToonMaterial({ color: cores.capa, gradientMap: gradienteToon, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(capaGeo, materialBoneco(cores.capa, { side: THREE.DoubleSide }));
     m.userData.semContorno = true;
     capa.add(m);
     corpo.add(capa);
@@ -181,7 +211,7 @@ export function criarHumanoide(cores, escala = 1) {
   adicionarContornoBoneco(raiz);
   raiz.scale.setScalar(escala);
   return {
-    raiz, corpo, cabeca, olhos, matOlho, bracoE: bracos[0], bracoD: bracos[1], antebracoE: antebracos[0], antebracoD: antebracos[1],
+    raiz, corpo, cabeca, olhos, olhosG, matOlho, bracoE: bracos[0], bracoD: bracos[1], antebracoE: antebracos[0], antebracoD: antebracos[1],
     pernaE: pernas[0], pernaD: pernas[1], canelaE: canelas[0], canelaD: canelas[1], capa, capaGeo, capaBase, t: 0,
   };
 }
@@ -198,86 +228,217 @@ function adicionarContornoBoneco(raiz) {
 
 const lerp = (a, b, t) => a + (b - a) * t;
 
-// animação simples do boneco
-// e: { voando, rapidez(0-1), inclinacao, andar(m/s), soco(0-1), segurando, dt }
+const suave = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const saidaRapida = (x) => 1 - (1 - x) * (1 - x) * (1 - x);
+
+// animação do boneco (herói e heróis inimigos)
+// e: { dt, voando, rapidez(0-1), inclinacao, andar(m/s), soco(1->0), socoLado, segurando,
+//      virada (giro em rad/s, para inclinar nas curvas), atordoado, pouso (0-1), pousoForte,
+//      olhar (inclinação da cabeça), corrida (velocista), pesado (gigante), investida }
 export function animarHumanoide(rig, e) {
   const dt = e.dt;
   rig.t += dt;
   const t = rig.t;
-  const k = Math.min(1, dt * 8);
-  let bEx = 0, bEz = 0.12, bDx = 0, bDz = -0.12, pE = 0, pD = 0, incl = 0;
+  const est = rig.est || (rig.est = { parado: 0, guarda: 0, piscar: 2 + Math.random() * 3, fase: 0, rolar: 0, torcao: 0, altura: 0 });
+  const k = Math.min(1, dt * 9);
+  const lento = Math.min(1, dt * 4);
 
-  if (e.voando) {
-    incl = e.inclinacao;
-    if (e.rapidez > 0.35) {
-      bDx = -2.95; bDz = -0.05; // braço estendido para frente (pose clássica)
-      bEx = 0.3; bEz = 0.25;
-    } else {
-      bEz = 0.35 + Math.sin(t * 2) * 0.05; bDz = -0.35 - Math.sin(t * 2) * 0.05;
-      bEx = -0.2; bDx = -0.2;
-    }
-    pE = 0.08 + Math.sin(t * 2.2) * 0.06;
-    pD = 0.18 + Math.sin(t * 2.2 + 1) * 0.06;
+  // alvos da pose
+  let bEx = 0, bEy = 0, bEz = 0.12, bDx = 0, bDy = 0, bDz = -0.12, cE = -0.25, cD = -0.25;
+  let pE = 0, pD = 0, pEz = 0.03, pDz = -0.03, jE = 0.05, jD = 0.05;
+  let incl = 0, torcao = 0, rolar = 0, altura = 0, cabX = 0, cabY = 0, cabZ = 0, esticar = 0;
+  const noChao = !e.voando && !(e.andar > 0.5);
+  est.parado = noChao ? est.parado + dt : 0;
+
+  if (e.voando && e.corrida) {
+    // velocista: corre no ar com passadas enormes
+    est.fase += dt * 24;
+    const sn = Math.sin(est.fase);
+    pE = sn * 1.15; pD = -sn * 1.15;
+    jE = 0.3 + Math.max(0, -sn) * 1.7; jD = 0.3 + Math.max(0, sn) * 1.7;
+    bEx = -sn * 1.2; bDx = sn * 1.2; bEz = 0.15; bDz = -0.15;
+    cE = cD = -1.45;
+    incl = 0.65; torcao = sn * 0.25; cabX = -0.45;
+    rolar = Math.max(-0.8, Math.min(0.8, -(e.virada || 0) * 0.2));
+  } else if (e.voando) {
+    const f = suave(0.25, 0.6, e.rapidez); // 0 = pairando, 1 = voo rápido
+    // pairando: pernas soltas, braços abertos, flutuando
+    const hb = Math.sin(t * 2);
+    const h = {
+      bEx: -0.15, bEz: 0.42 + hb * 0.06, bDx: -0.15, bDz: -0.42 - hb * 0.06, cE: -0.45, cD: -0.45,
+      pE: 0.04 + Math.sin(t * 2.2) * 0.08, pD: 0.3 + Math.sin(t * 2.2 + 1) * 0.08, jE: 0.25, jD: 0.75,
+    };
+    // voo rápido: punho direito na frente, braço esquerdo colado, pernas juntas tremulando
+    const tr = Math.sin(t * 16) * 0.05 * e.rapidez;
+    const v = { bEx: 0.35, bEz: 0.16, bDx: -2.95, bDz: -0.05, cE: -0.12, cD: 0, pE: 0.1 + tr, pD: 0.16 - tr, jE: 0.12, jD: 0.32 };
+    if (e.investida) { v.bEx = -2.9; v.bEz = 0.08; v.cE = 0; } // investida: os dois punhos na frente
+    bEx = h.bEx + (v.bEx - h.bEx) * f; bEz = h.bEz + (v.bEz - h.bEz) * f;
+    bDx = h.bDx + (v.bDx - h.bDx) * f; bDz = h.bDz + (v.bDz - h.bDz) * f;
+    cE = h.cE + (v.cE - h.cE) * f; cD = h.cD + (v.cD - h.cD) * f;
+    pE = h.pE + (v.pE - h.pE) * f; pD = h.pD + (v.pD - h.pD) * f;
+    jE = h.jE + (v.jE - h.jE) * f; jD = h.jD + (v.jD - h.jD) * f;
+    pEz = 0.06 * (1 - f) + 0.015; pDz = -pEz;
+    incl = e.inclinacao || 0;
+    altura = hb * 0.04 * (1 - f);
+    cabX = -incl * 0.55; // a cabeça olha para frente mesmo deitado no voo
+    // inclina o corpo nas curvas, como um avião
+    rolar = Math.max(-0.9, Math.min(0.9, -(e.virada || 0) * 0.3)) * (0.3 + f * 0.7);
+    cabZ = -rolar * 0.3;
+    esticar = Math.max(0, (e.rapidez - 0.75) / 0.25) * f; // estica um pouco em alta velocidade (efeito de desenho)
   } else if (e.andar > 0.5) {
-    const ritmo = Math.min(14, 4 + e.andar * 0.6);
-    const amp = Math.min(0.9, 0.3 + e.andar * 0.05);
-    const s = Math.sin(t * ritmo);
-    pE = s * amp; pD = -s * amp;
-    bEx = -s * amp * 0.8; bDx = s * amp * 0.8;
-    incl = Math.min(0.35, e.andar * 0.02);
+    // caminhada que vira corrida
+    const corre = suave(5, 15, e.andar);
+    const ritmo = e.pesado ? 2.2 + e.andar * 0.2 : Math.min(15, 5.5 + e.andar * 0.55);
+    est.fase += dt * ritmo;
+    const sn = Math.sin(est.fase), cs = Math.cos(est.fase);
+    const amp = e.pesado ? 0.45 : 0.42 + corre * 0.55;
+    pE = sn * amp; pD = -sn * amp;
+    jE = 0.08 + Math.max(0, -sn) * amp * 1.5 + corre * 0.25;
+    jD = 0.08 + Math.max(0, sn) * amp * 1.5 + corre * 0.25;
+    bEx = -sn * amp * 0.85; bDx = sn * amp * 0.85;
+    bEz = 0.12; bDz = -0.12;
+    cE = cD = -0.3 - corre * 1.15; // cotovelo dobra correndo
+    torcao = sn * (0.1 + corre * 0.12); // quadril e ombros giram
+    incl = 0.04 + corre * 0.28;
+    altura = Math.abs(cs) * (0.03 + corre * 0.06) - corre * 0.05; // sobe e desce a cada passo
+    rolar = sn * (e.pesado ? 0.09 : 0.03); // o gigante balança de um lado para o outro
+    cabX = -incl * 0.5;
   } else {
-    bEz = 0.12 + Math.sin(t * 1.5) * 0.02; bDz = -bEz;
+    // parado: respira; depois de um tempo faz a pose heroica (mãos na cintura) e olha em volta
+    const resp = Math.sin(t * 1.7);
+    altura = resp * 0.008;
+    bEz = 0.15 + resp * 0.02; bDz = -bEz;
+    cE = cD = -0.2;
+    pEz = 0.06; pDz = -0.06;
+    cabX = resp * 0.02;
+    const pose = suave(2.5, 3.4, est.parado);
+    if (pose > 0) {
+      // mãos na cintura, cotovelos abertos
+      bEx += (0.8 - bEx) * pose; bEy = 1.1 * pose; bEz += (-0.7 - bEz) * pose;
+      bDx += (0.8 - bDx) * pose; bDy = -1.1 * pose; bDz += (0.7 - bDz) * pose;
+      cE += (-1.2 - cE) * pose; cD += (-1.2 - cD) * pose;
+      pEz += 0.07 * pose; pDz -= 0.07 * pose;
+      incl -= 0.07 * pose; // peito estufado
+      cabY = Math.sin(t * 0.45) * 0.45 * pose;
+      cabX -= 0.08 * pose;
+    }
   }
-  if (e.segurando) { bEx = bDx = -1.45; bEz = -0.15; bDz = 0.15; }
-  const sSoco = e.soco > 0 ? Math.sin(e.soco * Math.PI) : 0;
-  if (e.soco > 0) {
-    if (e.socoLado === -1) { bEx = lerp(bEx, -1.6, sSoco); bEz = lerp(bEz, -0.1, sSoco); }
-    else { bDx = lerp(bDx, -1.6, sSoco); bDz = lerp(bDz, 0.1, sSoco); }
+  if (e.olhar !== undefined && !e.corrida) cabX += Math.max(-0.6, Math.min(0.6, e.olhar));
+
+  // segurando alguém na frente
+  if (e.segurando) { bEx = bDx = -1.45; bEz = -0.15; bDz = 0.15; cE = cD = -0.5; }
+
+  // guarda de lutador por um tempo depois de socar
+  if (e.soco > 0) est.guarda = 0.9;
+  est.guarda = Math.max(0, est.guarda - dt);
+  const g = suave(0, 0.3, est.guarda) * (e.segurando ? 0 : 1);
+  if (g > 0) {
+    bEx += (-1.05 - bEx) * g; bDx += (-1.05 - bDx) * g;
+    bEz += (0.3 - bEz) * g; bDz += (-0.3 - bDz) * g;
+    cE += (-1.75 - cE) * g; cD += (-1.75 - cD) * g;
+    cabX += 0.08 * g;
   }
 
-  // dobra dos cotovelos e joelhos
-  let cE = -0.25, cD = -0.25, jE = 0.05, jD = 0.05;
-  if (e.voando) {
-    cD = e.rapidez > 0.35 ? 0 : -0.35;
-    cE = -0.3;
-    jE = 0.2 + Math.sin(t * 2.2) * 0.05; jD = 0.45 + Math.sin(t * 2.2 + 1) * 0.05;
-  } else if (e.andar > 0.5) {
-    jE = Math.max(0, pE) * 1.3 + 0.1; jD = Math.max(0, pD) * 1.3 + 0.1;
-    cE = cD = -0.45 - Math.min(0.6, e.andar * 0.03);
+  // soco: prepara (puxa o braço), golpeia (estica com o corpo girando) e recolhe
+  let socando = false;
+  if (e.soco > 0 && !e.segurando) {
+    socando = true;
+    const p = 1 - e.soco;
+    let ext;
+    if (p < 0.16) ext = -p / 0.16; // puxa para trás
+    else if (p < 0.4) ext = -1 + 2 * saidaRapida((p - 0.16) / 0.24); // estica rápido
+    else ext = 1 - suave(0.4, 1, p) * 0.9; // recolhe devagar
+    const lado = e.socoLado === -1 ? -1 : 1;
+    const frente = Math.max(0, ext), tras = Math.max(0, -ext);
+    const bx = -1.05 + (-1.62 + 1.05) * frente + 0.7 * tras;
+    const cx = -1.75 * (1 - frente) + 0 * frente;
+    if (lado === -1) { bEx = bx; cE = cx; bEz = 0.3 - frente * 0.22; } else { bDx = bx; cD = cx; bDz = -0.3 + frente * 0.22; }
+    torcao = -lado * 0.35 * ext; // o tronco gira junto com o soco
+    incl += 0.18 * frente;
+    pE += lado === -1 ? -0.15 * frente : 0.2 * frente; pD += lado === -1 ? 0.2 * frente : -0.15 * frente;
   }
-  if (e.segurando) cE = cD = -0.5;
-  if (e.soco > 0) { if (e.socoLado === -1) cE = lerp(cE, 0, sSoco); else cD = lerp(cD, 0, sSoco); }
+
+  // atordoado: braços e pernas se debatendo, corpo arqueado
+  if (e.atordoado) {
+    bEx = -2.2 + Math.sin(t * 17) * 0.6; bDx = -1.9 + Math.sin(t * 15 + 1) * 0.6;
+    bEz = 0.95; bDz = -0.95; cE = cD = -0.6;
+    pE = -0.5 + Math.sin(t * 13) * 0.35; pD = 0.45 + Math.sin(t * 11) * 0.35;
+    jE = jD = 0.85;
+    incl = -0.55; rolar = Math.sin(t * 9) * 0.3; cabX = -0.35; esticar = 0;
+  }
+
+  // aterrissagem: agachada, ou a "pose de super-herói" (joelho e punho no chão) se foi forte
+  const a = e.pouso || 0;
+  if (a > 0) {
+    const w = suave(0, 0.35, a);
+    const P = e.pousoForte
+      ? { pE: -1.35, jE: 1.5, pD: 0.25, jD: 1.75, bDx: -0.55, bDz: -0.2, cD: -0.15, bEx: 0.7, bEz: 0.6, cE: -0.35, incl: 0.55, altura: -0.5, cabX: -0.25 }
+      : { pE: -0.7, jE: 1.2, pD: -0.55, jD: 1.1, bDx: -0.4, bDz: -0.75, cD: -0.3, bEx: -0.4, bEz: 0.75, cE: -0.3, incl: 0.35, altura: -0.3, cabX: -0.2 };
+    pE += (P.pE - pE) * w; jE += (P.jE - jE) * w; pD += (P.pD - pD) * w; jD += (P.jD - jD) * w;
+    bDx += (P.bDx - bDx) * w; bDz += (P.bDz - bDz) * w; cD += (P.cD - cD) * w;
+    bEx += (P.bEx - bEx) * w; bEz += (P.bEz - bEz) * w; cE += (P.cE - cE) * w;
+    incl += (P.incl - incl) * w; altura += (P.altura - altura) * w; cabX += (P.cabX - cabX) * w;
+    torcao *= 1 - w; rolar *= 1 - w;
+  }
+
+  // aplica (soco direto, o resto suavizado)
+  if (socando || g > 0 || e.segurando || e.atordoado || a > 0) bEy = bDy = 0; // a torção das mãos na cintura só vale parado
+  const kb = socando ? 1 : k;
+  rig.bracoE.rotation.y = lerp(rig.bracoE.rotation.y, bEy, k);
+  rig.bracoD.rotation.y = lerp(rig.bracoD.rotation.y, bDy, k);
   if (rig.antebracoE) {
-    rig.antebracoE.rotation.x = lerp(rig.antebracoE.rotation.x, cE, e.soco > 0 ? 1 : k);
-    rig.antebracoD.rotation.x = lerp(rig.antebracoD.rotation.x, cD, e.soco > 0 ? 1 : k);
-    rig.canelaE.rotation.x = lerp(rig.canelaE.rotation.x, jE, k);
-    rig.canelaD.rotation.x = lerp(rig.canelaD.rotation.x, jD, k);
+    rig.antebracoE.rotation.x = lerp(rig.antebracoE.rotation.x, cE, kb);
+    rig.antebracoD.rotation.x = lerp(rig.antebracoD.rotation.x, cD, kb);
+    rig.canelaE.rotation.x = lerp(rig.canelaE.rotation.x, jE, a > 0 ? 1 : k);
+    rig.canelaD.rotation.x = lerp(rig.canelaD.rotation.x, jD, a > 0 ? 1 : k);
   }
-  rig.bracoE.rotation.x = lerp(rig.bracoE.rotation.x, bEx, e.soco > 0 ? 1 : k);
-  rig.bracoE.rotation.z = lerp(rig.bracoE.rotation.z, bEz, k);
-  rig.bracoD.rotation.x = lerp(rig.bracoD.rotation.x, bDx, e.soco > 0 ? 1 : k);
-  rig.bracoD.rotation.z = lerp(rig.bracoD.rotation.z, bDz, k);
-  rig.pernaE.rotation.x = lerp(rig.pernaE.rotation.x, pE, k);
-  rig.pernaD.rotation.x = lerp(rig.pernaD.rotation.x, pD, k);
-  rig.corpo.rotation.x = lerp(rig.corpo.rotation.x, incl, Math.min(1, dt * 5));
+  rig.bracoE.rotation.x = lerp(rig.bracoE.rotation.x, bEx, kb);
+  rig.bracoE.rotation.z = lerp(rig.bracoE.rotation.z, bEz, kb);
+  rig.bracoD.rotation.x = lerp(rig.bracoD.rotation.x, bDx, kb);
+  rig.bracoD.rotation.z = lerp(rig.bracoD.rotation.z, bDz, kb);
+  rig.pernaE.rotation.x = lerp(rig.pernaE.rotation.x, pE, a > 0 ? 1 : k);
+  rig.pernaD.rotation.x = lerp(rig.pernaD.rotation.x, pD, a > 0 ? 1 : k);
+  rig.pernaE.rotation.z = lerp(rig.pernaE.rotation.z, pEz, k);
+  rig.pernaD.rotation.z = lerp(rig.pernaD.rotation.z, pDz, k);
+  rig.corpo.rotation.x = lerp(rig.corpo.rotation.x, incl, a > 0 || socando ? Math.min(1, dt * 14) : Math.min(1, dt * 5));
+  est.torcao = lerp(est.torcao, torcao, socando ? Math.min(1, dt * 25) : k);
+  est.rolar = lerp(est.rolar, rolar, lento);
+  rig.corpo.rotation.y = est.torcao;
+  rig.corpo.rotation.z = est.rolar;
+  est.altura = lerp(est.altura, altura, a > 0 ? Math.min(1, dt * 20) : k);
+  rig.corpo.position.y = 1.0 + est.altura;
+  rig.corpo.scale.set(1 - esticar * 0.05, 1 + esticar * 0.1, 1 - esticar * 0.05);
+  rig.cabeca.rotation.x = lerp(rig.cabeca.rotation.x, cabX, k);
+  rig.cabeca.rotation.y = lerp(rig.cabeca.rotation.y, cabY - est.torcao * 0.6, lento);
+  rig.cabeca.rotation.z = lerp(rig.cabeca.rotation.z, cabZ, lento);
 
-  // capa balançando
+  // piscar
+  if (rig.olhosG) {
+    est.piscar -= dt;
+    if (est.piscar < -0.12) est.piscar = 2 + Math.random() * 4;
+    const fechado = est.piscar < 0 ? 0.12 : e.atordoado ? 0.45 : 1;
+    for (const o of rig.olhosG) o.scale.y = fechado;
+  }
+
+  // capa: abre para trás com a velocidade, balança nas curvas, ondula com vento
   if (rig.capa) {
     const r = e.voando ? e.rapidez : Math.min(1, e.andar / 30);
-    // a capa abre para trás pela velocidade, menos o quanto o corpo já está deitado no voo
-    const abertura = Math.max(0.1, 0.12 + r * 1.3 - (e.inclinacao || 0) * 0.95);
+    const abertura = Math.max(0.1, 0.12 + r * 1.3 - (e.inclinacao || 0) * 0.95 + a * 0.5 + (e.atordoado ? 0.6 : 0));
     rig.capa.rotation.x = lerp(rig.capa.rotation.x, abertura, Math.min(1, dt * 4));
+    rig.capa.rotation.z = lerp(rig.capa.rotation.z, -est.rolar * 0.7 - est.torcao * 0.6, Math.min(1, dt * 3));
     const pos = rig.capaGeo.attributes.position;
     const base = rig.capaBase;
-    const freq = 5 + r * 16;
-    const amp = 0.04 + r * 0.1;
+    const freq = 4 + r * 18;
+    const amp = 0.035 + r * 0.11;
     for (let i = 0; i < pos.count; i++) {
       const x = base[i * 3], y = base[i * 3 + 1];
       const d = -y; // distância do ombro
-      pos.array[i * 3 + 2] = Math.sin(t * freq + y * 4 + x * 3) * amp * d;
-      pos.array[i * 3] = x * (1 + d * 0.25);
+      const onda = Math.sin(t * freq + y * 4.5 + x * 3) + Math.sin(t * freq * 1.7 - y * 7 + x * 5) * 0.35;
+      pos.array[i * 3 + 2] = onda * amp * d - Math.abs(x) * 0.12 * (1 - r); // as pontas curvam em volta do corpo
+      pos.array[i * 3] = x * (1 + d * (0.2 + r * 0.15));
     }
     pos.needsUpdate = true;
+    rig.capaGeo.computeVertexNormals();
   }
 }
 
@@ -346,6 +507,8 @@ export class Heroi {
     else this.vel.lerp(_v, 1 - Math.exp(-acel * dt));
 
     this.anterior.copy(this.pos);
+    const vyAntes = this.vel.y;
+    const noArAntes = this.pos.y > 0.05;
     const rapido = this.vel.length() > 12;
     if (rapido) {
       this.pos.addScaledVector(this.vel, dt);
@@ -360,6 +523,13 @@ export class Heroi {
       this.pos.addScaledVector(this.vel, dt); // já está dentro de um bloco: deixa sair
     }
     if (this.pos.y < 0) { this.pos.y = 0; if (this.vel.y < 0) this.vel.y = 0; }
+    // ---------- aterrissagem e decolagem ----------
+    if (noArAntes && this.pos.y <= 0.05 && vyAntes < -14) this.aterrissar(vyAntes, Math.hypot(this.vel.x, this.vel.z));
+    if (!noArAntes && this.pos.y > 0.05 && this.vel.y > 8 && !(this.pouso > 0.3)) {
+      jogo.efeitos?.poeira(this.pos, 4, 2, 4); // decolagem levanta poeira
+      jogo.efeitos?.ondaDeChoque(_v.copy(this.pos).setY(0.3), 4, 0.3, 0xd8c9a8);
+    }
+    if (this.pouso > 0) this.pouso = Math.max(0, this.pouso - dt * (this.pousoForte ? 0.9 : 2.2) * (_desejo.lengthSq() > 0 ? 3 : 1));
     if (this.pos.y > 400) { this.pos.y = 400; this.vel.y = Math.min(0, this.vel.y); }
     const r = Math.hypot(this.pos.x, this.pos.z);
     if (r > 800) { this.pos.x *= 800 / r; this.pos.z *= 800 / r; }
@@ -406,6 +576,35 @@ export class Heroi {
     this.animar(dt, cam);
   }
 
+  // pouso no chão: agacha, ou "pose de super-herói" com onda de choque se vier rápido
+  aterrissar(vy, horiz) {
+    const jogo = this.jogo;
+    const forte = vy < -40 || horiz > 70;
+    this.pouso = 1;
+    this.pousoForte = forte;
+    _v.copy(this.pos).setY(0.3);
+    if (forte) {
+      this.vel.x *= 0.1; this.vel.z *= 0.1;
+      jogo.efeitos?.ondaDeChoque(_v, 16, 0.5, 0xd8c9a8);
+      jogo.efeitos?.ondaDeChoque(_v, 9, 0.3, 0xffffff);
+      jogo.efeitos?.poeira(_v, 14, 6, 7);
+      jogo.efeitos?.lascas?.(_v, 10, _base.set(0, 8, 0), new THREE.Color(0x777777));
+      jogo.camera?.tremer(0.55);
+      jogo.camera?.socoFov?.(5);
+      jogo.detritos?.empurrar(_v, 14, 14);
+      jogo.audio?.impacto(1, _v);
+      // quem estiver perto cai
+      for (const e of jogo.entidades) {
+        if (e.remover || e.estado !== 'normal' || e.pos.distanceTo(this.pos) > 12) continue;
+        _base.subVectors(e.pos, this.pos).setY(0).normalize().multiplyScalar(10 / Math.sqrt(e.massa)).setY(6);
+        if (e.massa < 5) e.lancar(_base, true);
+      }
+    } else {
+      jogo.efeitos?.poeira(_v, 5, 2.5, 4);
+      jogo.audio?.impacto(0.4, _v);
+    }
+  }
+
   animar(dt, cam) {
     const rig = this.rig;
     const vel = this.vel.length();
@@ -418,6 +617,11 @@ export class Heroi {
     if (this.olharCamera || this.segurando || this.soco > 0) yawAlvo = cam.yaw + Math.PI;
     else if (horiz > 1.5) yawAlvo = Math.atan2(this.vel.x, this.vel.z);
     this.yawCorpo = anguloLerp(this.yawCorpo, yawAlvo, Math.min(1, dt * 10));
+    let giro = this.yawCorpo - (this.yawAnterior ?? this.yawCorpo);
+    while (giro > Math.PI) giro -= Math.PI * 2;
+    while (giro < -Math.PI) giro += Math.PI * 2;
+    this.yawAnterior = this.yawCorpo;
+    this.virada = lerp(this.virada || 0, dt > 0 ? giro / dt : 0, Math.min(1, dt * 6));
     rig.raiz.rotation.y = this.yawCorpo;
     rig.raiz.position.copy(this.pos);
 
@@ -432,6 +636,8 @@ export class Heroi {
     animarHumanoide(rig, {
       dt, voando, rapidez: Math.min(1, vel / 60), inclinacao: incl,
       andar: noChao && !this.superVelocidade ? horiz : 0, soco: this.soco, socoLado: this.socoLado, segurando: !!this.segurando,
+      virada: this.virada, atordoado: this.atordoado > 0 && vel > 15, pouso: noChao ? this.pouso || 0 : 0, pousoForte: this.pousoForte,
+      olhar: this.olharCamera ? -cam.pitch * 0.6 : 0, investida: !!this.jogo.combate?.investida,
     });
     if (!voando) rig.raiz.position.y += 0;
     else if (vel < 5) rig.raiz.position.y += Math.sin(rig.t * 2) * 0.08; // flutuando

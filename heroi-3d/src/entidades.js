@@ -278,6 +278,7 @@ export class Pedestre extends Entidade {
     this.velAndar = 1.2 + Math.random() * 0.6;
     this.medo = 0;
     this.fase = Math.random() * 10;
+    this.obj.rotation.order = 'YXZ'; // balança de lado e inclina para frente sem entortar
     const p = this.pontoCanto(canto);
     this.pos.set(p.x + (Math.random() - 0.5) * 10 * (canto % 2), 0.2, p.z + (Math.random() - 0.5) * 10 * ((canto + 1) % 2));
   }
@@ -315,7 +316,12 @@ export class Pedestre extends Entidade {
     }
     this.pos.x += vx * vel * dt;
     this.pos.z += vz * vel * dt;
-    this.pos.y = 0.2 + Math.abs(Math.sin(this.fase * vel * 2.5)) * 0.06;
+    // passinhos: sobe e desce, balança de um lado para o outro; com medo corre inclinado e pulando mais
+    const passo = Math.sin(this.fase * vel * 2.5);
+    const correndo = this.medo > 0 ? 1 : 0;
+    this.pos.y = 0.2 + Math.abs(passo) * (0.06 + correndo * 0.08);
+    this.obj.rotation.z = passo * (0.05 + correndo * 0.05) * (vx || vz ? 1 : 0);
+    this.obj.rotation.x += ((correndo ? 0.28 : 0.03) - this.obj.rotation.x) * Math.min(1, dt * 6);
     if (vx || vz) this.obj.rotation.y = anguloLerp(this.obj.rotation.y, Math.atan2(vx, vz), Math.min(1, dt * 10));
   }
 

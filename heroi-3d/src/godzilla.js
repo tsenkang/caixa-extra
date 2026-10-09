@@ -253,10 +253,11 @@ export class Godzilla extends Entidade {
     const livre = Math.max(0, 100 - this.janelaDano);
     qtd = Math.min(qtd, livre);
     this.janelaDano += qtd;
+    if (qtd > 15) this.dor = Math.min(1, (this.dor || 0) + qtd / 80); // se encolhe com golpes fortes
     this.danoRecente += qtd;
     super.levarDano(qtd, origem);
   }
-  danoDireto(qtd) { super.levarDano(qtd, 'heroi'); }
+  danoDireto(qtd) { this.dor = 1; super.levarDano(qtd, 'heroi'); }
 
   furioso() { return this.vida < this.vidaMax * 0.5; }
 
@@ -587,8 +588,11 @@ export class Godzilla extends Entidade {
     const carga = this.fase === 'carregar' ? 1 : 0;
     const soprando = this.fase === 'sopro' ? 1 : 0;
     const l = (a, b, k = 4) => a + (b - a) * Math.min(1, dt * k);
-    this.peito.rotation.x = l(this.peito.rotation.x, 0.22 - rugido * 0.35 + mordida * 0.35 + carga * -0.12 + soprando * 0.08 + Math.sin(t * 1.3) * 0.02);
-    this.cabeca.rotation.x = l(this.cabeca.rotation.x, -rugido * 0.55 + mordida * 0.3 - carga * 0.25 + soprando * 0.15, 6);
+    this.dor = Math.max(0, (this.dor || 0) - dt * 2.5);
+    const dor = this.dor * this.dor;
+    this.peito.rotation.x = l(this.peito.rotation.x, -dor * 0.25 + 0.22 - rugido * 0.35 + mordida * 0.35 + carga * -0.12 + soprando * 0.08 + Math.sin(t * 1.3) * 0.02);
+    this.cabeca.rotation.z = l(this.cabeca.rotation.z, Math.sin(t * 30) * dor * 0.25, 12);
+    this.cabeca.rotation.x = l(this.cabeca.rotation.x, -dor * 0.4 + -rugido * 0.55 + mordida * 0.3 - carga * 0.25 + soprando * 0.15, 6);
     this.mandibula.rotation.x = l(this.mandibula.rotation.x, Math.max(rugido, mordida > 0.5 ? 0 : mordida * 1.6, soprando) * 0.75 + carga * 0.2, 10);
     for (const [i, b] of this.bracos.entries()) b.rotation.x = Math.sin(t * 1.5 + i) * 0.1 - rugido * 0.5;
 

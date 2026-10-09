@@ -475,9 +475,19 @@ export class HeroiInimigo extends Entidade {
   aoSerPego() { this.tempoEstado = 0; this.raio3d?.esconder(); if (this.feixe) this.feixe.ativo = false; }
 
   animar(dt, vel, voando) {
+    // giro do corpo (para inclinar nas curvas) e troca de braço a cada soco novo
+    let giro = this.obj.rotation.y - (this.yawAnterior ?? this.obj.rotation.y);
+    while (giro > Math.PI) giro -= Math.PI * 2;
+    while (giro < -Math.PI) giro += Math.PI * 2;
+    this.yawAnterior = this.obj.rotation.y;
+    this.virada = (this.virada || 0) + ((dt > 0 ? giro / dt : 0) - (this.virada || 0)) * Math.min(1, dt * 6);
+    if ((this.soco ?? 0) > (this.socoAnterior ?? 0) + 0.3) this.socoLado = -(this.socoLado || 1);
+    this.socoAnterior = this.soco ?? 0;
+    const corrida = this.variante === 'rapido' && vel > 25;
     animarHumanoide(this.rig, {
       dt, voando, rapidez: Math.min(1, vel / 40), inclinacao: voando ? Math.min(1.3, vel / 40) : 0,
-      andar: voando ? 0 : vel * 1.6, soco: this.soco ?? 0, segurando: false,
+      andar: voando ? 0 : vel * 1.6, soco: this.soco ?? 0, socoLado: this.socoLado, segurando: false,
+      virada: this.virada, atordoado: this.atordoadoT > 0 || this.estado === 'preso', corrida, pesado: this.variante === 'gigante',
     });
     this.soco = Math.max(0, (this.soco ?? 0) - dt * 4);
   }
