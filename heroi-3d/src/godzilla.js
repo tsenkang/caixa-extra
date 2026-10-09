@@ -44,12 +44,12 @@ function geoPlaca(alt, larg) {
 export class Godzilla extends Entidade {
   constructor(jogo) {
     const raiz = new THREE.Group();
-    super(jogo, raiz, { tipo: 'godzilla', raio: 10, altura: 50, vida: 7000, massa: 400, agarravel: false, inimigo: true, contorno: 0.14 });
+    super(jogo, raiz, { tipo: 'godzilla', raio: 10, altura: 50, vida: 11000, massa: 400, agarravel: false, inimigo: true, contorno: 0.14 });
     this.chefe = true;
     this.nome = 'GODZILLA';
     this.corBarra = 'linear-gradient(90deg,#1e3a8a,#38bdf8,#e0f2fe)';
-    this.resistenciaLaser = 0.5;
-    this.danoChoque = 700; // o choque de raios machuca muito mais que o laser
+    this.resistenciaLaser = 0.35; // couro grosso: o laser faz pouco dano
+    this.danoChoque = 550; // o choque de raios machuca muito mais que o laser
     this.montarModelo();
 
     // nasce longe, na beira da cidade
@@ -73,7 +73,9 @@ export class Godzilla extends Entidade {
     this.fase = 'rugido';
     this.timer = 2.4;
     this.espera = 3;
-    this.cd = { mordida: 0, pisao: 4, cauda: 6, sopro: 7, rugido: 18 };
+    this.cd = { mordida: 0, pisao: 3, cauda: 4, sopro: 5, rugido: 16, pulso: 6, rajada: 3 };
+    this.orbes = []; // bolas atômicas cuspidas
+    this.danoRecente = 0; // dano levado nos últimos segundos (se apanhar muito, solta o pulso)
     this.passoFase = 0;
     this.t = 0;
     this.giroCauda = 0;
@@ -248,14 +250,15 @@ export class Godzilla extends Entidade {
   // o dano é limitado por instante (senão atravessar o corpo voando seria vitória fácil)
   levarDano(qtd, origem) {
     if (this.estado === 'morto' || !Number.isFinite(qtd)) return;
-    const livre = Math.max(0, 150 - this.janelaDano);
+    const livre = Math.max(0, 100 - this.janelaDano);
     qtd = Math.min(qtd, livre);
     this.janelaDano += qtd;
+    this.danoRecente += qtd;
     super.levarDano(qtd, origem);
   }
   danoDireto(qtd) { super.levarDano(qtd, 'heroi'); }
 
-  furioso() { return this.vida < this.vidaMax * 0.4; }
+  furioso() { return this.vida < this.vidaMax * 0.5; }
 
   // ---------- comportamento ----------
   atualizar(dt) {
@@ -277,16 +280,28 @@ export class Godzilla extends Entidade {
       jogo.hud.mensagem('GODZILLA ESTÁ FURIOSO!', '#38bdf8');
       this.fase = 'rugido'; this.timer = 2.4; jogo.audio?.rugido?.();
     }
-    const kc = furia ? 0.6 : 1; // ataques mais frequentes na fúria
+    const kc = furia ? 0.5 : 0.8; // ataques mais frequentes na fúria
     for (const k in this.cd) this.cd[k] -= dt;
     this.espera -= dt;
     this.timer -= dt;
     this.esperaBatida -= dt;
+    this.danoRecente = Math.max(0, this.danoRecente - dt * 120);
+    this.atualizarOrbes(dt);
+    // apanhou muito de perto: solta o pulso nuclear (interrompe o que estiver fazendo)
+    if (this.danoRecente > 450 && this.fase !== 'pulso' && this.fase !== 'sopro' && this.cd.pulso < 3) {
+      this.danoRecente = 0;
+      this.iniciarPulso();
+    }
     const dx = heroi.pos.x - this.pos.x, dz = heroi.pos.z - this.pos.z;
     const dist = Math.hypot(dx, dz) || 1;
     const distCabeca = this.esferas[1].c.distanceTo(_h);
     let andar = 0;
 
+    // radiação: perto dele o herói não se cura (precisa se afastar para recuperar a vida)
+    if (dist < 110 && !heroi.morto) {
+      heroi.tempoSemDano = Math.min(heroi.tempoSemDano, 2);
+      if (!this.avisouRadiacao) { this.avisouRadiacao = true; jogo.hud.mensagem('RADIAÇÃO: PERTO DELE VOCÊ NÃO SE CURA', '#a3e635'); }
+    }
     // marca perigo em volta (as pessoas fogem)
     if (Math.random() < dt * 2) jogo.marcarPerigo(this.pos, 90);
 
@@ -297,8 +312,8 @@ export class Godzilla extends Entidade {
           this.esperaBatida = 0.6;
           _d.subVectors(_h, e.c).normalize();
           heroi.vel.copy(_d).multiplyScalar(Math.max(30, heroi.vel.length() * 0.35));
-          heroi.atordoado = 0.35;
-          heroi.levarDano(10);
+          heroi.atordoado = 0.5;
+          heroi.levarDano(22);
           jogo.efeitos.faiscas(_h, 14, 14, [1, 0.95, 0.8]);
           jogo.camera.tremer(0.5);
           jogo.audio?.impacto(1, _h);
@@ -309,8 +324,8 @@ export class Godzilla extends Entidade {
 
     if (this.fase === 'andar') {
       // vira devagar e anda até o herói
-      this.obj.rotation.y = anguloLerp(this.obj.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * (furia ? 1.1 : 0.7)));
-      if (dist > 38) andar = furia ? 9 : 7;
+      this.obj.rotation.y = anguloLerp(this.obj.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * (furia ? 1.8 : 1.2)));
+      if (dist > 38) andar = furia ? 14 : 10;
       if (this.espera <= 0 && !heroi.morto) this.escolherAtaque(dist, distCabeca, kc);
     } else if (this.fase === 'rugido') {
       // levanta a cabeça e ruge: onda que empurra o herói
@@ -341,7 +356,7 @@ export class Godzilla extends Entidade {
       if (Math.random() < 0.7) jogo.efeitos.faiscas(_c, 2, 4 + k * 8, [0.4, 0.75, 1]);
       jogo.camera.tremer(0.04 * k);
       if (this.timer <= 0) {
-        this.fase = 'sopro'; this.timer = furia ? 4.2 : 3.4;
+        this.fase = 'sopro'; this.timer = furia ? 5 : 4;
         this.alvoRaio.copy(_h).add(_v.set((Math.random() - 0.5) * 30, -8, (Math.random() - 0.5) * 30));
         this.tempoExplosao = 0;
         jogo.audio?.soproAtomico?.(true);
@@ -368,7 +383,7 @@ export class Godzilla extends Entidade {
           _d.subVectors(_h, this.pos).setY(0).normalize().setY(0.35);
           heroi.vel.copy(_d).multiplyScalar(130);
           heroi.atordoado = 0.6;
-          heroi.levarDano(48);
+          heroi.levarDano(65);
           jogo.efeitos.faiscas(_h, 20, 20, [1, 0.9, 0.7]);
           jogo.camera.tremer(0.9);
           jogo.congelar(0.1);
@@ -395,12 +410,30 @@ export class Godzilla extends Entidade {
         const d = Math.hypot(_h.x - _c.x, _h.z - _c.z);
         if (d < 42 && _h.y < 22 && !heroi.morto) {
           const f = 1 - d / 42;
-          heroi.levarDano(55 * f + 8);
+          heroi.levarDano(70 * f + 12);
           heroi.vel.set(_h.x - _c.x, 0, _h.z - _c.z).normalize().setY(0.8).multiplyScalar(60 * f + 30);
           heroi.atordoado = 0.5;
         }
       }
       if (this.timer <= 0) { this.fase = 'andar'; this.pisou = false; this.posePisao = 0; this.espera = 1; }
+    } else if (this.fase === 'pulso') {
+      // as placas piscam cada vez mais rápido e o corpo inteiro explode em energia
+      const k = 1 - Math.max(0, this.timer) / this.tempoPulso;
+      this.brilhoPlacas = k > 0.2 ? (Math.sin(this.t * (20 + k * 40)) > 0 ? 1 : 0.4) : k * 4;
+      this.centro(_c);
+      if (Math.random() < 0.8) jogo.efeitos.faiscas(_c.clone().add(_v.set((Math.random() - 0.5) * 20, (Math.random() - 0.3) * 30, (Math.random() - 0.5) * 16)), 3, 10, [0.4, 0.8, 1]);
+      jogo.camera.tremer(0.05 + k * 0.1);
+      if (this.timer <= 0) this.explodirPulso();
+    } else if (this.fase === 'rajada') {
+      // cospe bolas atômicas que perseguem o herói
+      this.obj.rotation.y = anguloLerp(this.obj.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 3));
+      this.brilhoPlacas = 0.6;
+      const total = this.furioso() ? 7 : 4;
+      if (this.cuspidas < total && this.timer < 1.5 - this.cuspidas * 0.2) {
+        this.cuspidas++;
+        this.cuspir();
+      }
+      if (this.timer <= 0) { this.fase = 'andar'; this.brilhoPlacas = 0; this.espera = 0.6; }
     } else if (this.fase === 'mordida') {
       const k = 1 - Math.max(0, this.timer) / 0.8;
       this.poseMordida = Math.sin(k * Math.PI);
@@ -409,7 +442,7 @@ export class Godzilla extends Entidade {
         this.mordeu = true;
         if (distCabeca < 13 && !heroi.morto) {
           this.boca.getWorldPosition(_c);
-          heroi.levarDano(55);
+          heroi.levarDano(75);
           heroi.vel.subVectors(_h, _c).normalize().setY(-0.6).normalize().multiplyScalar(110);
           heroi.atordoado = 0.6;
           jogo.efeitos.faiscas(_h, 24, 18, [1, 0.85, 0.7]);
@@ -452,6 +485,13 @@ export class Godzilla extends Entidade {
     const jogo = this.jogo;
     const hy = jogo.heroi.pos.y;
     const cd = this.cd;
+    const dTronco = this.esferas[0].c.distanceTo(jogo.heroi.centro(_h));
+    if (dTronco < 34 && cd.pulso <= 0) { this.iniciarPulso(); return; }
+    if ((dist > 55 || hy > 40) && cd.rajada <= 0) {
+      this.fase = 'rajada'; this.timer = 1.6; this.cuspidas = 0; cd.rajada = 6 * kc;
+      this.espera = 99;
+      return;
+    }
     if (distCabeca < 14 && cd.mordida <= 0) { this.fase = 'mordida'; this.timer = 0.8; cd.mordida = 3 * kc; }
     else if (dist < 32 && hy < 22 && cd.pisao <= 0) { this.fase = 'pisao'; this.timer = 1.3; cd.pisao = 5 * kc; jogo.audio?.rugido?.(0.4); }
     else if (dist < 52 && hy < 38 && cd.cauda <= 0) {
@@ -459,7 +499,7 @@ export class Godzilla extends Entidade {
       this.yawInicio = this.obj.rotation.y; this.sentidoGiro = Math.random() < 0.5 ? 1 : -1; this.acertouCauda = false;
       jogo.audio?.arremesso();
     } else if (dist < 280 && cd.sopro <= 0) {
-      this.fase = 'carregar'; this.tempoCarga = this.furioso() ? 1.4 : 2.1; this.timer = this.tempoCarga; cd.sopro = 11 * kc;
+      this.fase = 'carregar'; this.tempoCarga = this.furioso() ? 1.1 : 1.6; this.timer = this.tempoCarga; cd.sopro = 11 * kc;
       jogo.audio?.soproAtomico?.(false);
     } else if (dist < 70 && cd.rugido <= 0) {
       this.fase = 'rugido'; this.timer = 2.4; cd.rugido = 14 * kc; jogo.audio?.rugido?.();
@@ -474,7 +514,7 @@ export class Godzilla extends Entidade {
     heroi.centro(_h);
     this.brilhoPlacas = 1;
     // a mira persegue o herói devagar (na fúria varre de um lado para o outro)
-    this.alvoRaio.lerp(_h, Math.min(1, dt * (furia ? 1.3 : 1.7)));
+    this.alvoRaio.lerp(_h, Math.min(1, dt * (furia ? 2.4 : 2.6))); // persegue bem rápido: só fugindo em super velocidade
     if (furia) {
       _d.subVectors(_h, this.pos).setY(0).normalize();
       this.alvoRaio.addScaledVector(_v.set(-_d.z, 0, _d.x), Math.sin(this.t * 2.5) * 50 * dt);
@@ -489,8 +529,8 @@ export class Godzilla extends Entidade {
     if (jogo.choque?.ativo === this) {
       this.timer = Math.max(this.timer, 0.3); // não para no meio do choque
     } else {
-      if (!heroi.morto && distSegmento(_h, _c, _v) < 3) {
-        heroi.levarDano(90 * dt);
+      if (!heroi.morto && distSegmento(_h, _c, _v) < 4.5) {
+        heroi.levarDano(140 * dt);
         heroi.vel.addScaledVector(_d, 60 * dt);
         fim = Math.min(fim, _c.distanceTo(_h));
         _v.copy(_c).addScaledVector(_d, fim);
@@ -570,6 +610,106 @@ export class Godzilla extends Entidade {
     this.matCostas.emissiveIntensity = base + (b > 0.15 ? Math.min(1, (b - 0.15) * 2) * (3.5 + Math.sin(t * 30) * 0.8) : 0);
   }
 
+  // ---------- pulso nuclear: explosão em volta do corpo (castiga quem fica batendo de perto) ----------
+  iniciarPulso() {
+    this.fase = 'pulso';
+    this.tempoPulso = this.furioso() ? 0.8 : 1.1;
+    this.timer = this.tempoPulso;
+    this.cd.pulso = this.furioso() ? 7 : 10;
+    this.espera = 99;
+    this.feixe.ativo = false;
+    this.raio3d.esconder();
+    this.giroCauda = 0; this.posePisao = 0; this.poseMordida = 0; this.poseRugido = 0;
+    this.jogo.hud.mensagem('PULSO NUCLEAR! AFASTE-SE!', '#7dd3fc');
+    this.jogo.audio?.soproAtomico?.(false);
+  }
+
+  explodirPulso() {
+    const jogo = this.jogo;
+    const heroi = jogo.heroi;
+    this.centro(_c);
+    const R = 48;
+    jogo.efeitos.ondaDeChoque(_c, R * 1.2, 0.8, 0x9fdcff);
+    jogo.efeitos.ondaDeChoque(_c, R * 0.8, 0.6, 0xffffff);
+    jogo.efeitos.ondaDeChoque(_v.set(this.pos.x, 0.5, this.pos.z), R * 1.4, 1, 0x7dd3fc);
+    jogo.efeitos.clarao(_c, 4, 0.8, 0x9fdcff);
+    jogo.efeitos.faiscas(_c, 90, 50, [0.5, 0.85, 1]);
+    jogo.efeitos.brilho(_c, 30, 0.4, 0.75, 1);
+    jogo.predios.danificarEsfera(_c, 16, 3000, { forca: 28, origem: 'inimigo', pedacos: 1, max: 260 });
+    jogo.detritos.empurrar(_c, 70, 40);
+    jogo.camera.tremer(1);
+    jogo.camera.socoFov?.(12);
+    jogo.audio?.explosao(1.8, _c);
+    heroi.centro(_h);
+    const d = _h.distanceTo(_c);
+    if (d < R && !heroi.morto) {
+      const f = 1 - d / R;
+      heroi.levarDano(40 + 80 * f);
+      heroi.vel.subVectors(_h, _c).normalize().multiplyScalar(80 + 80 * f);
+      heroi.atordoado = 0.8;
+      jogo.congelar(0.12);
+    }
+    if (heroi.segurando && heroi.segurando !== this) heroi.segurando.levarDano(500, 'inimigo');
+    this.fase = 'andar';
+    this.brilhoPlacas = 0;
+    this.espera = 0.8;
+  }
+
+  // ---------- bolas atômicas (ataque de longe) ----------
+  cuspir() {
+    const jogo = this.jogo;
+    this.boca.getWorldPosition(_c);
+    jogo.heroi.centro(_h);
+    // mira um pouco à frente de onde o herói está indo
+    _h.addScaledVector(jogo.heroi.vel, 0.5);
+    _d.subVectors(_h, _c).normalize();
+    _d.x += (Math.random() - 0.5) * 0.15; _d.z += (Math.random() - 0.5) * 0.15;
+    _d.normalize();
+    if (!this.geoOrbe) {
+      this.geoOrbe = new THREE.SphereGeometry(1, 16, 12);
+      this.matOrbe = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x6fd0ff).multiplyScalar(4) });
+    }
+    const mesh = new THREE.Mesh(this.geoOrbe, this.matOrbe);
+    mesh.scale.setScalar(2.2);
+    mesh.position.copy(_c);
+    mesh.frustumCulled = false;
+    jogo.cena.add(mesh);
+    this.orbes.push({ mesh, pos: mesh.position, vel: _d.clone().multiplyScalar(this.furioso() ? 115 : 95), vida: 0 });
+    jogo.efeitos.brilho(_c, 5, 0.4, 0.8, 1);
+    jogo.audio?.missil(_c);
+    this.poseMordida = 0.6;
+  }
+
+  atualizarOrbes(dt) {
+    const jogo = this.jogo;
+    const heroi = jogo.heroi;
+    heroi.centro(_h);
+    for (let i = this.orbes.length - 1; i >= 0; i--) {
+      const o = this.orbes[i];
+      o.vida += dt;
+      // persegue o herói (curva devagar: dá para desviar voando de lado)
+      const vel = o.vel.length();
+      _d.subVectors(_h, o.pos).normalize().multiplyScalar(vel);
+      o.vel.lerp(_d, Math.min(1, dt * 2.2)).setLength(vel);
+      o.pos.addScaledVector(o.vel, dt);
+      o.mesh.scale.setScalar(2.2 + Math.sin(o.vida * 30) * 0.3);
+      jogo.efeitos.aditivo.emitir(o.pos.x, o.pos.y, o.pos.z, { vx: 0, vy: 0, vz: 0, vida: 0.4, tamIni: 3.5, tamFim: 0.5, alfa: 0.6, gravidade: 0, arrasto: 0, r: 0.35, g: 0.75, b: 1 });
+      let bateu = o.vida > 6 || o.pos.y < 0.5 || jogo.predios.solido(o.pos.x, o.pos.y, o.pos.z);
+      if (!bateu && !heroi.morto && o.pos.distanceTo(_h) < 3.2) {
+        bateu = true;
+        heroi.levarDano(40); // acerto direto
+        heroi.vel.copy(o.vel).setLength(70);
+        heroi.atordoado = 0.5;
+      }
+      if (bateu) {
+        jogo.cena.remove(o.mesh);
+        this.orbes.splice(i, 1);
+        jogo.explosao(o.pos, 8, 70, 'inimigo', this);
+        jogo.efeitos.ondaDeChoque(o.pos, 14, 0.4, 0x9fdcff);
+      }
+    }
+  }
+
   // ---------- derrota: último rugido e queda de lado esmagando prédios ----------
   morrer() {
     if (this.estado === 'morto') return;
@@ -578,6 +718,8 @@ export class Godzilla extends Entidade {
     this.tempoEstado = 0;
     this.feixe.ativo = false;
     this.raio3d.esconder();
+    for (const o of this.orbes) this.jogo.cena.remove(o.mesh);
+    this.orbes.length = 0;
     this.ladoQueda = Math.random() < 0.5 ? 1 : -1;
     this.caiu = false;
     jogo.hud.mensagem('GODZILLA CAIU!', '#4ade80');
