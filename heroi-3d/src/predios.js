@@ -4,6 +4,7 @@
 // Quando um bloco quebra, a instância some e nasce um pedaço com física (detritos.js).
 import * as THREE from 'three';
 import { materialMundo } from './modelos.js';
+import { CONCRETO, VIDRO, TIJOLO, FERRO } from './detritos.js';
 import { texturaJanela, texturaConcreto, texturaJanelaAcesa, texturaVidro, texturaTijolo, texturaLoja } from './texturas.js';
 
 const HP_BLOCO = 30;
@@ -20,6 +21,10 @@ const _c = new THREE.Color();
 const _vel = new THREE.Vector3();
 const _ang = new THREE.Vector3();
 const _tam = new THREE.Vector3();
+const _cConcreto = new THREE.Color();
+const _cTijolo = new THREE.Color();
+const _branco = new THREE.Color(1, 1, 1);
+const _corVidro = new THREE.Color(0.75, 0.88, 0.95);
 
 export class SistemaPredios {
   constructor(jogo) {
@@ -356,40 +361,67 @@ export class SistemaPredios {
     this.centroCelula(p, idx, _p);
     if (p.formato[idx] === 1) _p.y += -p.ty / 2 + ESP / 2;
     _c.setRGB(p.cores[idx * 3], p.cores[idx * 3 + 1], p.cores[idx * 3 + 2]);
+    const m = p.malha[idx]; // 1 janela, 2 liso, 3 janela acesa, 4 vidro, 5 tijolo, 6 loja
+    const bx = vel.x, by = vel.y, bz = vel.z; // vel pode ser o mesmo vetor _vel
+    // um fragmento com material de verdade, espalhado em volta do bloco
+    const fragmento = (tipo, tx, ty, tz, giro = 8, cor = _c) => {
+      _tam.set(tx, ty, tz);
+      _s.set(
+        _p.x + (Math.random() - 0.5) * p.tx * 0.6,
+        _p.y + (Math.random() - 0.5) * p.ty * 0.6,
+        _p.z + (Math.random() - 0.5) * p.tz * 0.6);
+      _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(giro);
+      const k = 0.75 + Math.random() * 0.6;
+      det.criar(_s, _tam, cor, _vel.set(bx * k + (Math.random() - 0.5) * 7, by * k + Math.random() * 5, bz * k + (Math.random() - 0.5) * 7), _ang, tipo);
+    };
+    // concreto por dentro é cinza (só um pouco da cor da pintura)
+    _cConcreto.setRGB(0.8, 0.79, 0.76).lerp(_c, 0.2);
     if (det) {
       if (p.formato[idx] !== 0) {
-        // laje/rampa: quebra em duas placas finas
+        // laje/rampa: quebra em duas placas finas + às vezes um vergalhão exposto
         this.tamanhoPeca(p, idx, _tam);
         _tam.x *= 0.5;
-        const bx = vel.x, by = vel.y, bz = vel.z; // vel pode ser o mesmo vetor _vel
         for (const lado of [-1, 1]) {
           _s.set(_p.x + lado * p.tx * 0.25, _p.y, _p.z);
           _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(4);
-          det.criar(_s, _tam, _c, _vel.set(bx + lado * 2, by, bz), _ang);
+          det.criar(_s, _tam, _c, _vel.set(bx + lado * 2, by, bz), _ang, 2);
         }
+        if (pedacos > 1 && Math.random() < 0.5) fragmento(FERRO, 0.06, 2 + Math.random() * 1.5, 0.06, 5, _branco);
       } else if (pedacos <= 1) {
+        // desabamento: o bloco cai inteiro, com a cara do prédio
         _tam.set(p.tx * 0.95, p.ty * 0.95, p.tz * 0.95);
         _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(3);
-        det.criar(_p, _tam, _c, vel, _ang);
-      } else {
-        const bx = vel.x, by = vel.y, bz = vel.z; // vel pode ser o mesmo vetor _vel
-        for (let n = 0; n < pedacos; n++) {
-          const e = 0.28 + Math.random() * 0.3;
-          _tam.set(p.tx * e, p.ty * (0.22 + Math.random() * 0.35), p.tz * (0.28 + Math.random() * 0.3));
-          const pos = _s.set(
-            _p.x + (Math.random() - 0.5) * p.tx * 0.5,
-            _p.y + (Math.random() - 0.5) * p.ty * 0.5,
-            _p.z + (Math.random() - 0.5) * p.tz * 0.5);
-          _ang.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(8);
-          const k = 0.75 + Math.random() * 0.6;
-          const vx = bx * k + (Math.random() - 0.5) * 7, vy = by * k + Math.random() * 5, vz = bz * k + (Math.random() - 0.5) * 7;
-          det.criar(pos, _tam, _c, _vel.set(vx, vy, vz), _ang);
+        det.criar(_p, _tam, _c, vel, _ang, m);
+      } else if (m === 4) {
+        // fachada de vidro: chuva de cacos + um pedaço do caixilho
+        for (let n = 0; n < pedacos * 2 + 1; n++) {
+          const t = 0.35 + Math.random() * 0.9;
+          fragmento(VIDRO, t, t * (0.6 + Math.random() * 0.8), 0.05, 14, _branco);
         }
+        fragmento(4, p.tx * 0.45, p.ty * 0.3, p.tz * 0.3);
+      } else if (m === 5) {
+        // tijolo: vários tijolos soltos + um torrão de parede ainda grudado
+        for (let n = 0; n < pedacos * 2; n++) {
+          _cTijolo.setRGB(0.85 + Math.random() * 0.25, 0.8 + Math.random() * 0.2, 0.78 + Math.random() * 0.2);
+          fragmento(TIJOLO, 0.45, 0.2, 0.22, 10, _cTijolo);
+        }
+        fragmento(5, p.tx * 0.4, p.ty * 0.35, p.tz * 0.35);
+      } else {
+        // concreto: um pedaço da fachada, pedras de concreto, vergalhão e (se tinha janela) cacos de vidro
+        fragmento(m, p.tx * (0.35 + Math.random() * 0.2), p.ty * (0.3 + Math.random() * 0.2), p.tz * (0.3 + Math.random() * 0.2));
+        for (let n = 1; n < pedacos; n++) {
+          const e = 0.5 + Math.random() * 0.9;
+          fragmento(CONCRETO, e * (0.8 + Math.random() * 0.5), e * (0.6 + Math.random() * 0.5), e * (0.8 + Math.random() * 0.5), 8, _cConcreto);
+        }
+        if (Math.random() < 0.35) fragmento(FERRO, 0.06, 1.4 + Math.random() * 1.6, 0.06, 6, _branco);
+        if (m !== 2) for (let n = 0; n < 2; n++) { const t = 0.3 + Math.random() * 0.5; fragmento(VIDRO, t, t, 0.04, 14, _branco); }
       }
     }
-    // lascas pequenas (só partículas, sem física) + poeira
-    this.jogo.efeitos?.lascas(_p, 6, vel, _c);
-    if (Math.random() < 0.5) this.jogo.efeitos?.poeira(_p, 2, 1.5, 3.5);
+    if (m === 4 && pedacos > 1) this.jogo.audio?.vidro?.(_p);
+    // lascas pequenas (só partículas, sem física) + poeira de concreto
+    this.jogo.efeitos?.lascas(_p, 6, vel, m === 4 ? _corVidro : m === 5 ? _c : _cConcreto);
+    if (m === 4 || m === 1 || m === 3 || m === 6) this.jogo.efeitos?.faiscas(_p, 3, 6, [0.85, 0.95, 1]); // brilho de vidro estilhaçando
+    if (Math.random() < 0.5 && m !== 4) this.jogo.efeitos?.poeira(_p, 2, 1.5, 3.5);
   }
 
   checarDestruido(p) {

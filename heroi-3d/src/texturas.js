@@ -270,3 +270,48 @@ export function texturaLoja() {
   profundidade(ctx, t, 8, 46, 70, 66);
   return finalizar(c);
 }
+
+// miolo de concreto quebrado: cinza áspero com pedrinhas (brita) e furinhos
+export function texturaEntulho() {
+  const t = 128;
+  const [c, ctx] = canvas(t);
+  ctx.fillStyle = '#b9b6b0';
+  ctx.fillRect(0, 0, t, t);
+  ruido(ctx, t, 40);
+  for (let i = 0; i < 140; i++) {
+    const v = 120 + Math.random() * 90;
+    ctx.fillStyle = `rgb(${v},${v - 4},${v - 10})`;
+    const r = 1 + Math.random() * 3.5;
+    ctx.beginPath();
+    ctx.ellipse(Math.random() * t, Math.random() * t, r, r * (0.5 + Math.random() * 0.5), Math.random() * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(40,38,36,0.55)';
+  for (let i = 0; i < 70; i++) ctx.fillRect(Math.random() * t, Math.random() * t, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  // rachaduras
+  ctx.strokeStyle = 'rgba(50,45,40,0.5)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    let x = Math.random() * t, y = Math.random() * t;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    for (let k = 0; k < 5; k++) { x += (Math.random() - 0.5) * 30; y += (Math.random() - 0.5) * 30; ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  const tex = finalizar(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+// um tijolo solto (com massa grudada nas bordas)
+export function texturaTijoloSolto() {
+  const t = 64;
+  const [c, ctx] = canvas(t);
+  ctx.fillStyle = '#a9553c';
+  ctx.fillRect(0, 0, t, t);
+  ruido(ctx, t, 45);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  for (let i = 0; i < 25; i++) ctx.fillRect(Math.random() * t, Math.random() * t, 2, 2);
+  ctx.fillStyle = 'rgba(225,218,205,0.8)';
+  for (let i = 0; i < 6; i++) ctx.fillRect(Math.random() * t, Math.random() < 0.5 ? 0 : t - 5, 6 + Math.random() * 16, 5);
+  return finalizar(c);
+}

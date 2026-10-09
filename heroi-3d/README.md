@@ -15,6 +15,7 @@ Botão esquerdo laser · Botão direito segurar = pegar / soltar = arremessar ·
 ## O que tem no jogo
 - Cidade com 12 quarteirões: prédios altos (10 a 25 andares), casas, praça com chafariz, posto (as bombas explodem!).
 - Prédios feitos de blocos: laser, soco, carros arremessados e explosões quebram blocos; se a base cair, o prédio desaba.
+- Destruição com material de verdade: blocos inteiros caem com a cara do prédio; batidas soltam pedras de concreto, vergalhões de ferro torcidos, tijolos soltos e cacos de vidro (que brilham, tilintam no chão e somem mais rápido).
 - O jogo tem 6 fases: 1) O Exército (derrote 12 inimigos), 2) Voltagem (raio azul), 3) Corisco (super rápido), 4) Colosso (gigante), 5) O Viltrumita (penúltimo chefe: combos, agarrão e "pinball" pelos prédios), 6) GODZILLA (chefe final: sopro atômico, giro de cauda, pisão, mordida e rugido).
 - Entre as fases a vida enche. No menu ("Começar na fase") dá para escolher qualquer fase, e ao cair dá para tentar a mesma fase de novo.
 - Viltrumita (versão difícil): 3200 de vida, bloqueia socos e revida, escapa do combo no 3º soco seguido (só leva o combo inteiro na brecha logo depois que ataca), desvia do laser e do avanço, e se regenera se ficar 3 s sem apanhar.

@@ -155,6 +155,14 @@ export class Audio {
       this.tom({ freq: 320, freqFim: 110, dur: 3.4, volume: 0.3, forma: 'sawtooth' });
     }
   }
+  // vidro se quebrando no chão
+  vidro(pos) {
+    if (!this.pode('vidro', 0.08)) return;
+    const v = this.volumeDistancia(pos, 120);
+    if (v <= 0) return;
+    this.tocarRuido({ dur: 0.25, freq: 5200, tipo: 'highpass', q: 2, volume: 0.25 * v });
+    this.tom({ freq: 2600 + Math.random() * 1800, freqFim: 2000, dur: 0.18, volume: 0.06 * v, forma: 'triangle' });
+  }
   pegar() { this.tom({ freq: 300, freqFim: 150, dur: 0.15, volume: 0.3, forma: 'triangle' }); }
   arremesso() { this.tocarRuido({ dur: 0.5, freq: 600, freqFim: 2500, tipo: 'bandpass', q: 1.5, volume: 0.6 }); }
 
