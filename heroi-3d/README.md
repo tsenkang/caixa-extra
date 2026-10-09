@@ -16,7 +16,7 @@ Botão esquerdo laser · Botão direito segurar = pegar / soltar = arremessar ·
 - Cidade com 12 quarteirões: prédios altos (10 a 25 andares), casas, praça com chafariz, posto (as bombas explodem!).
 - Prédios feitos de blocos: laser, soco, carros arremessados e explosões quebram blocos; se a base cair, o prédio desaba.
 - O jogo tem 6 fases: 1) O Exército (derrote 12 inimigos), 2) Voltagem (raio azul), 3) Corisco (super rápido), 4) Colosso (gigante), 5) O Viltrumita (penúltimo chefe: combos, agarrão e "pinball" pelos prédios), 6) GODZILLA (chefe final: sopro atômico, giro de cauda, pisão, mordida e rugido).
-- Entre as fases a vida enche. As fases vencidas ficam liberadas no menu ("Começar na fase"), e ao cair dá para tentar a mesma fase de novo.
+- Entre as fases a vida enche. No menu ("Começar na fase") dá para escolher qualquer fase, e ao cair dá para tentar a mesma fase de novo.
 - Dica contra o Godzilla: quando as placas das costas acenderem, ele vai soltar o sopro atômico. Atire o laser de volta na boca dele para causar um choque de raios (dano enorme).
 - O exército continua chegando conforme o alerta (estrelas).
 - P pausa. As opções do menu (sombras e brilho) ajudam se o FPS ficar baixo.

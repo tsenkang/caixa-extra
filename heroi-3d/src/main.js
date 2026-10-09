@@ -318,11 +318,10 @@ try { inicio = Number(sessionStorage.getItem('heroi-fase-inicio')) || 0; session
 FASES.forEach((f, i) => {
   const o = document.createElement('option');
   o.value = i;
-  o.textContent = `${i + 1}. ${f.titulo}${i > faseLiberada() ? ' 🔒' : ''}`;
-  o.disabled = i > faseLiberada();
+  o.textContent = `${i + 1}. ${f.titulo}${i <= faseLiberada() && i > 0 ? ' ✓' : ''}`; // ✓ = já chegou nela
   selFase.appendChild(o);
 });
-selFase.value = String(Math.min(inicio, faseLiberada()));
+selFase.value = String(inicio);
 document.getElementById('btn-tentar').addEventListener('click', () => {
   try { sessionStorage.setItem('heroi-fase-inicio', String(jogo.fases.atual)); } catch { /* sem armazenamento */ }
   location.reload();
