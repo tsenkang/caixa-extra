@@ -119,6 +119,8 @@ export class Combate {
   acertar(alvo) {
     const jogo = this.jogo;
     const heroi = jogo.heroi;
+    // alguns chefes (Viltrumita) bloqueiam o soco e revidam
+    if (alvo.bloquear?.()) { this.combo = 0; jogo.hud.combo(0); heroi.soco = 1; return; }
     this.combo++;
     this.tempoCombo = 1.4;
     const golpe = Math.min(3, ((this.combo - 1) % 3) + 1); // 1, 2, 3, 1, 2, 3...

@@ -17,6 +17,7 @@ Botão esquerdo laser · Botão direito segurar = pegar / soltar = arremessar ·
 - Prédios feitos de blocos: laser, soco, carros arremessados e explosões quebram blocos; se a base cair, o prédio desaba.
 - O jogo tem 6 fases: 1) O Exército (derrote 12 inimigos), 2) Voltagem (raio azul), 3) Corisco (super rápido), 4) Colosso (gigante), 5) O Viltrumita (penúltimo chefe: combos, agarrão e "pinball" pelos prédios), 6) GODZILLA (chefe final: sopro atômico, giro de cauda, pisão, mordida e rugido).
 - Entre as fases a vida enche. No menu ("Começar na fase") dá para escolher qualquer fase, e ao cair dá para tentar a mesma fase de novo.
+- Viltrumita (versão difícil): 3200 de vida, bloqueia socos e revida, escapa do combo no 3º soco seguido (só leva o combo inteiro na brecha logo depois que ataca), desvia do laser e do avanço, e se regenera se ficar 3 s sem apanhar.
 - Godzilla (versão difícil): 11000 de vida, couro que resiste ao laser, pulso nuclear se você ficar batendo de perto, bolas atômicas teleguiadas se você ficar longe, e radiação: perto dele (110 m) você não se cura.
 - Dica contra o Godzilla: quando as placas das costas acenderem, ele vai soltar o sopro atômico. Atire o laser de volta na boca dele para causar um choque de raios (dano enorme).
 - O exército continua chegando conforme o alerta (estrelas).

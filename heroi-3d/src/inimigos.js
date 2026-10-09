@@ -385,7 +385,7 @@ export const TIPOS = {
     cores: { uniforme: 0xfacc15, detalhe: 0xdc2626, botas: 0xdc2626, cinto: 0xdc2626, emblema: 0xdc2626, mascara: 0xdc2626, cabelo: 0x7a3b10, emblemaRaio: true, fisico: { ombros: 0.92, bracos: 0.9, pernas: 0.95 } },
   },
   viltrumita: {
-    nome: 'VILTRUMITA', vida: 2200, escala: 1.15, corBarra: 'linear-gradient(90deg,#7f1d1d,#ef4444)',
+    nome: 'VILTRUMITA', vida: 3200, escala: 1.15, corBarra: 'linear-gradient(90deg,#7f1d1d,#ef4444)',
     cores: { uniforme: 0xf1f1ee, detalhe: 0xb91c1c, capa: 0xb91c1c, botas: 0x9f1515, cinto: 0xb91c1c, emblema: 0xb91c1c, cabelo: 0x2a2626, bigode: 0x2a2626, olho: 0x3b2a1a, fisico: { ombros: 1.18, bracos: 1.15, pernas: 1.05 } },
   },
   gigante: {
@@ -407,7 +407,7 @@ export class HeroiInimigo extends Entidade {
     this.chefe = true;
     this.nome = cfg.nome;
     if (tipo === 'rapido') this.resistenciaLaser = 0.55; // vibra tão rápido que o laser pega só de raspão
-    if (tipo === 'viltrumita') this.resistenciaLaser = 0.5; // pele quase indestrutível
+    if (tipo === 'viltrumita') this.resistenciaLaser = 0.35; // pele quase indestrutível
     this.corBarra = cfg.corBarra;
     this.fase = 'mover';
     this.timer = 2;
@@ -435,7 +435,7 @@ export class HeroiInimigo extends Entidade {
     if (this.estado === 'preso') {
       // se solta depois de um tempo
       this.tempoEstado += dt;
-      if (this.tempoEstado > (this.variante === 'viltrumita' ? 1.1 : 2.4)) {
+      if (this.tempoEstado > (this.variante === 'viltrumita' ? 0.7 : 2.4)) {
         const heroi = this.jogo.heroi;
         if (heroi.segurando === this) heroi.segurando = null;
         this.estado = 'normal';
@@ -678,6 +678,32 @@ export class HeroiInimigo extends Entidade {
     if (this.velAnim > 30) this.rastro(1);
   }
 
+  // o Viltrumita bloqueia socos quando não está atacando e revida na hora
+  bloquear() {
+    if (this.variante !== 'viltrumita' || this.estado !== 'normal') return false;
+    if (this.fase === 'pausa') return false; // a brecha depois do ataque dele: aí ele apanha
+    const jogo0 = this.jogo;
+    // conta os socos seguidos: no 3º ele escapa do combo (só leva o combo inteiro na brecha)
+    if (jogo0.tempo - (this.ultimoSocoLevado ?? -9) > 1.2) this.socosSeguidos = 0;
+    this.ultimoSocoLevado = jogo0.tempo;
+    this.socosSeguidos = (this.socosSeguidos ?? 0) + 1;
+    const furia = this.vida < this.vidaMax * 0.5;
+    let bloqueia = this.socosSeguidos >= 3;
+    if (!bloqueia && !(this.atordoadoT > 0) && (this.fase === 'cercar' || this.fase === 'investida')) bloqueia = Math.random() < (furia ? 0.75 : 0.55);
+    if (!bloqueia) return false;
+    this.socosSeguidos = 0;
+    this.atordoadoT = 0;
+    const jogo = this.jogo;
+    this.centro(_c);
+    jogo.efeitos.faiscas(_c, 18, 14, [1, 1, 1]);
+    jogo.efeitos.ondaDeChoque(_c, 6, 0.25, 0xffffff);
+    jogo.hud.mensagem('BLOQUEOU!', '#ef4444');
+    jogo.audio?.impacto(0.8, _c);
+    this.socoNoHeroi(24, 120); // contra-ataque
+    this.fase = 'perseguir'; this.timer = 1.2; this.golpesPinball = 1;
+    return true;
+  }
+
   // golpe com direção escolhida (para o "pinball" do Viltrumita)
   golpeDirecao(dano, dir, forca) {
     const jogo = this.jogo;
@@ -710,12 +736,25 @@ export class HeroiInimigo extends Entidade {
     if (furia && !this.avisouFuria) { this.avisouFuria = true; jogo.hud.mensagem('O VILTRUMITA ESTÁ FURIOSO!', '#ef4444'); }
     const dist = _c.distanceTo(_h);
     if (!this.fase || this.fase === 'mover') { this.fase = 'cercar'; this.timer = 2; }
+    // cura viltrumita: 3 s sem apanhar e ele começa a se regenerar
+    if (this.vida < (this.ultimaVida ?? this.vida)) this.semDano = 0;
+    else this.semDano = (this.semDano ?? 0) + dt;
+    if (this.semDano > 3 && this.vida < this.vidaMax) {
+      this.vida = Math.min(this.vidaMax, this.vida + 25 * dt);
+      if (Math.random() < 0.15) jogo.efeitos.faiscas(_c, 1, 3, [0.5, 1, 0.5]);
+    }
+    this.ultimaVida = this.vida;
+    // desvia do avanço do combo (F) enquanto circula
+    if (jogo.combate?.avanco?.alvo === this && this.fase === 'cercar' && this.esquiva <= 0) {
+      this.esquiva = 0.9;
+      if (Math.random() < 0.5) this.teleporteLateral([1, 0.95, 0.9]);
+    }
     if (heroi.morto && this.fase !== 'cercar') { this.fase = 'cercar'; this.timer = 99; }
 
     // desvia do laser às vezes
     if (jogo.laser.ativo && jogo.mira.entidade === this && this.esquiva <= 0 && (this.fase === 'cercar' || this.fase === 'pausa')) {
-      this.esquiva = 1.6;
-      if (Math.random() < 0.45) this.teleporteLateral([1, 0.95, 0.9]);
+      this.esquiva = 0.9;
+      if (Math.random() < 0.7) this.teleporteLateral([1, 0.95, 0.9]);
     }
 
     if (this.fase === 'cercar') {
@@ -731,10 +770,10 @@ export class HeroiInimigo extends Entidade {
         jogo.audio?.arremesso();
       }
     } else if (this.fase === 'investida') {
-      _d.subVectors(_h, _c).normalize().multiplyScalar(165 * f);
+      _d.subVectors(_h, _c).normalize().multiplyScalar(195 * f);
       this.vel.lerp(_d, Math.min(1, dt * 9));
       if (dist < 3.5) {
-        if (Math.random() < 0.4) this.iniciarAgarrao();
+        if (Math.random() < (furia ? 0.55 : 0.4)) this.iniciarAgarrao();
         else { this.fase = 'combo'; this.timer = 0.05; this.golpes = 0; }
       } else if (this.timer <= 0) { this.fase = 'cercar'; this.timer = 1; }
     } else if (this.fase === 'combo') {
@@ -747,7 +786,7 @@ export class HeroiInimigo extends Entidade {
         this.timer = 0.24 / f;
         this.soco = 1;
         if (this.golpes < 3) {
-          heroi.levarDano(13);
+          heroi.levarDano(18);
           heroi.vel.addScaledVector(_d, -18);
           heroi.atordoado = 0.3;
           _v.copy(_h).lerp(_c, 0.4);
@@ -758,13 +797,13 @@ export class HeroiInimigo extends Entidade {
         } else {
           // o terceiro manda o herói voando através dos prédios
           _v.copy(_d).negate().setY(0.15).normalize();
-          this.golpeDirecao(28, _v, 140);
+          this.golpeDirecao(35, _v, 150);
           this.fase = 'perseguir'; this.timer = 1.4; this.golpesPinball = furia ? 3 : 2;
         }
       }
     } else if (this.fase === 'perseguir') {
       // alcança o herói ainda voando e bate de novo para outro lado
-      _d.subVectors(_h, _c).normalize().multiplyScalar(210 * f);
+      _d.subVectors(_h, _c).normalize().multiplyScalar(240 * f);
       this.vel.lerp(_d, Math.min(1, dt * 10));
       if (dist < 4 && this.golpesPinball > 0) {
         this.golpesPinball--;
@@ -772,16 +811,16 @@ export class HeroiInimigo extends Entidade {
         if (this.golpesPinball === 0) {
           // último: martelada de cima para baixo (cratera no chão)
           _v.set(heroi.vel.x * 0.002, -1, heroi.vel.z * 0.002).normalize();
-          this.golpeDirecao(30, _v, 150);
+          this.golpeDirecao(38, _v, 160);
           this.martelando = true;
-          this.fase = 'pausa'; this.timer = 1.1 / f;
+          this.fase = 'pausa'; this.timer = 0.8 / f;
           this.vel.set(0, 12, 0);
         } else {
           const a = Math.random() * Math.PI * 2;
           _v.set(Math.cos(a), 0.35 + Math.random() * 0.4, Math.sin(a)).normalize();
-          this.golpeDirecao(20, _v, 130);
+          this.golpeDirecao(26, _v, 140);
         }
-      } else if (this.timer <= 0) { this.fase = 'pausa'; this.timer = 0.8; }
+      } else if (this.timer <= 0) { this.fase = 'pausa'; this.timer = 0.6; }
     } else if (this.fase === 'agarrao') {
       // segura o herói e voa arrastando a cara dele pelos prédios
       _d.copy(this.dirAgarrao);
@@ -808,7 +847,7 @@ export class HeroiInimigo extends Entidade {
     } else if (this.fase === 'pausa') {
       // brecha para o herói revidar
       this.vel.multiplyScalar(Math.max(0, 1 - dt * 3));
-      if (this.timer <= 0) { this.fase = 'cercar'; this.timer = (1.6 + Math.random() * 1.4) / f; }
+      if (this.timer <= 0) { this.fase = 'cercar'; this.timer = (1 + Math.random()) / f; }
     }
 
     // herói martelado contra o chão: cratera
