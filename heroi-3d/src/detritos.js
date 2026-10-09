@@ -3,6 +3,7 @@
 // Os outros usam uma física simples (gravidade + chão + topo dos prédios), mais barata.
 // No máximo MAX pedaços ao mesmo tempo: os mais antigos são apagados.
 import * as THREE from 'three';
+import { materialMundo } from './modelos.js';
 import * as CANNON from 'cannon-es';
 import { texturaJanela } from './texturas.js';
 
@@ -34,7 +35,7 @@ export class SistemaDetritos {
     this.poolCorpos = [];
 
     // malha instanciada
-    const mat = new THREE.MeshLambertMaterial({ map: texturaJanela() }); // pedaços com a cara do prédio
+    const mat = materialMundo({ map: texturaJanela() }); // pedaços com a cara do prédio
     this.malha = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, MAX);
     this.malha.castShadow = true;
     this.malha.receiveShadow = true;

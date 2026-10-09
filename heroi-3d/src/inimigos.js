@@ -1,7 +1,7 @@
 // Inimigos: soldados, jipes, tanques, helicópteros e heróis inimigos. Também os tiros e mísseis.
 import * as THREE from 'three';
 import { Entidade, Veiculo, NOS, NOS_PONTA, anguloLerp } from './entidades.js';
-import { materialCores, geoSoldado, geoJipe, geoTanqueCasco, geoTanqueTorre, geoTanqueCano, geoHelicoptero, geoHeliceHeli, geoHeliceCauda, geoPedra } from './modelos.js';
+import { materialCores, geoSoldado, geoJipe, geoTanqueCasco, geoTanqueTorre, geoTanqueCano, geoHelicoptero, geoHeliceHeli, geoHeliceCauda, geoPedra, materialMundo } from './modelos.js';
 import { criarHumanoide, animarHumanoide } from './heroi.js';
 import { Raio } from './efeitos.js';
 
@@ -43,7 +43,7 @@ export class Projeteis {
 
     this.misseis = [];
     this.geoMissil = new THREE.CylinderGeometry(0.15, 0.15, 1.6, 8);
-    this.matMissil = new THREE.MeshLambertMaterial({ color: 0xd4d4d4, emissive: 0x331100 });
+    this.matMissil = materialMundo({ color: 0xd4d4d4, emissive: 0x331100 });
     this.matPedra = materialCores;
   }
 

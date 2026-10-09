@@ -1,5 +1,6 @@
 // Monta a cidade: chão, ruas, calçadas, praça, posto, prédios, casas, árvores, céu e luz.
 import * as THREE from 'three';
+import { materialMundo } from './modelos.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { texturaRua, texturaGrama, texturaCalcada } from './texturas.js';
 
@@ -69,7 +70,7 @@ export function criarCidade(jogo) {
   // ---------- chão ----------
   const texGrama = texturaGrama();
   texGrama.repeat.set(160, 160);
-  const chao = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ map: texGrama }));
+  const chao = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), materialMundo({ map: texGrama }));
   chao.rotation.x = -Math.PI / 2;
   chao.receiveShadow = true;
   cena.add(chao);
@@ -80,7 +81,7 @@ export function criarCidade(jogo) {
     const t = texRua.clone();
     t.needsUpdate = true;
     t.repeat.set(1, comp / 9);
-    return new THREE.MeshLambertMaterial({ map: t });
+    return materialMundo({ map: t });
   };
   const compZ = FIM_Z * 2, compX = FIM_X * 2;
   const matRuaZ = matRua(compZ), matRuaX = matRua(compX);
@@ -100,7 +101,7 @@ export function criarCidade(jogo) {
     cena.add(r);
   }
   // cruzamentos lisos (escondem as faixas)
-  const matCruz = new THREE.MeshLambertMaterial({ color: 0x3a3c40 });
+  const matCruz = materialMundo({ color: 0x3a3c40 });
   const geoCruz = new THREE.PlaneGeometry(ASFALTO, ASFALTO);
   for (const x of RUAS_X) for (const z of RUAS_Z) {
     const c = new THREE.Mesh(geoCruz, matCruz);
@@ -113,11 +114,11 @@ export function criarCidade(jogo) {
   // quarteirões: placa de calçada + lote
   const texCalc = texturaCalcada();
   texCalc.repeat.set(17, 17);
-  const matCalcada = new THREE.MeshLambertMaterial({ map: texCalc });
-  const matLoteGrama = new THREE.MeshLambertMaterial({ map: texGrama.clone() });
+  const matCalcada = materialMundo({ map: texCalc });
+  const matLoteGrama = materialMundo({ map: texGrama.clone() });
   matLoteGrama.map.repeat.set(4, 4);
   matLoteGrama.map.needsUpdate = true;
-  const matLoteConcreto = new THREE.MeshLambertMaterial({ color: 0x9c9890 });
+  const matLoteConcreto = materialMundo({ color: 0x9c9890 });
   const geoPlaca = new THREE.BoxGeometry(META_PLACA * 2, 0.2, META_PLACA * 2);
   const geoLote = new THREE.PlaneGeometry(META_LOTE * 2, META_LOTE * 2);
 
@@ -165,10 +166,10 @@ function criarPostes(cena) {
       pontos.push([q.cx + t, q.cz - d, 0], [q.cx + t, q.cz + d, Math.PI], [q.cx - d, q.cz + t, Math.PI / 2], [q.cx + d, q.cz + t, -Math.PI / 2]);
     }
   }
-  const haste = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.13, 6, 6), new THREE.MeshLambertMaterial({ color: 0x3b4048 }), pontos.length);
+  const haste = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.13, 6, 6), materialMundo({ color: 0x3b4048 }), pontos.length);
   const geoBraco = new THREE.BoxGeometry(0.1, 0.1, 1.6).translate(0, 0, -0.7);
-  const braco = new THREE.InstancedMesh(geoBraco, new THREE.MeshLambertMaterial({ color: 0x3b4048 }), pontos.length);
-  const lampada = new THREE.InstancedMesh(new THREE.BoxGeometry(0.45, 0.15, 0.7), new THREE.MeshLambertMaterial({ color: 0xfff3c4, emissive: 0x6b5a2a }), pontos.length);
+  const braco = new THREE.InstancedMesh(geoBraco, materialMundo({ color: 0x3b4048 }), pontos.length);
+  const lampada = new THREE.InstancedMesh(new THREE.BoxGeometry(0.45, 0.15, 0.7), materialMundo({ color: 0xfff3c4, emissive: 0x6b5a2a }), pontos.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
   pontos.forEach(([x, z, r], i) => {
     q.setFromEuler(e.set(0, r, 0));
@@ -219,8 +220,8 @@ function criarHorizonte(cena) {
     const r = 700 + Math.random() * 200;
     perto.push(montanha(Math.cos(a) * r, Math.sin(a) * r, 90 + Math.random() * 90, 40 + Math.random() * 70, new THREE.Color(0x5f8f4a), false));
   }
-  cena.add(new THREE.Mesh(mergeGeometries(longe), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false })));
-  const colinas = new THREE.Mesh(mergeGeometries(perto), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  cena.add(new THREE.Mesh(mergeGeometries(longe), materialMundo({ vertexColors: true, flatShading: true, fog: false })));
+  const colinas = new THREE.Mesh(mergeGeometries(perto), materialMundo({ vertexColors: true, flatShading: true }));
   cena.add(colinas);
 
   const nuvens = [];
@@ -233,7 +234,7 @@ function criarHorizonte(cena) {
       nuvens.push(g.toNonIndexed());
     }
   }
-  const matNuvem = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xb8c4d6, fog: false, transparent: true, opacity: 0.92 });
+  const matNuvem = materialMundo({ color: 0xffffff, emissive: 0xb8c4d6, fog: false, transparent: true, opacity: 0.92 });
   cena.add(new THREE.Mesh(mergeGeometries(nuvens), matNuvem));
 }
 
@@ -272,10 +273,10 @@ function criarCeu(dirSol) {
 
 function criarArvores(cena, arvores, jogo) {
   const n = arvores.length;
-  const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.32, 2.6, 6), new THREE.MeshLambertMaterial({ color: 0x6b4a2b }), n);
+  const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2, 0.32, 2.6, 6), materialMundo({ color: 0x6b4a2b }), n);
   const geoCopa = new THREE.IcosahedronGeometry(1.8, 1);
-  const copa1 = new THREE.InstancedMesh(geoCopa, new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), n);
-  const copa2 = new THREE.InstancedMesh(geoCopa, new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), n);
+  const copa1 = new THREE.InstancedMesh(geoCopa, materialMundo({ color: 0xffffff, flatShading: true }), n);
+  const copa2 = new THREE.InstancedMesh(geoCopa, materialMundo({ color: 0xffffff, flatShading: true }), n);
   const verdes = [0x3f7f2f, 0x4f8f35, 0x2f6b2a, 0x5f9a3a, 0x6b8f2a];
   const m = new THREE.Matrix4(), c = new THREE.Color();
   arvores.forEach((a, i) => {
@@ -306,7 +307,7 @@ function criarFaixasPedestre(cena) {
       listras.push([x + o, z - d, 0], [x + o, z + d, 0], [x - d, z + o, 1], [x + d, z + o, 1]);
     }
   }
-  const malha = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.02, 3), new THREE.MeshLambertMaterial({ color: 0xf2f0e6 }), listras.length);
+  const malha = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.02, 3), materialMundo({ color: 0xf2f0e6 }), listras.length);
   const m = new THREE.Matrix4();
   listras.forEach(([x, z, r], i) => {
     m.makeRotationY(r ? Math.PI / 2 : 0).setPosition(x, 0.11, z);
@@ -408,7 +409,7 @@ function criarCasa(predios, cx, cz) {
 }
 
 function montarPraca(cena, q, arvores) {
-  const matCaminho = new THREE.MeshLambertMaterial({ color: 0xcfc6b0 });
+  const matCaminho = materialMundo({ color: 0xcfc6b0 });
   for (const rot of [0, Math.PI / 2]) {
     const c = new THREE.Mesh(new THREE.PlaneGeometry(4, META_LOTE * 2), matCaminho);
     c.rotation.x = -Math.PI / 2;
@@ -418,10 +419,10 @@ function montarPraca(cena, q, arvores) {
     cena.add(c);
   }
   // chafariz
-  const pedra = new THREE.MeshLambertMaterial({ color: 0xbdb6a8 });
+  const pedra = materialMundo({ color: 0xbdb6a8 });
   const base = new THREE.Mesh(new THREE.CylinderGeometry(5, 5.4, 0.8, 24), pedra);
   base.position.set(q.cx, 0.6, q.cz);
-  const agua = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 0.1, 24), new THREE.MeshLambertMaterial({ color: 0x4aa3df, transparent: true, opacity: 0.85 }));
+  const agua = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 0.1, 24), materialMundo({ color: 0x4aa3df, transparent: true, opacity: 0.85 }));
   agua.position.set(q.cx, 0.95, q.cz);
   const coluna = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 3, 10), pedra);
   coluna.position.set(q.cx, 2, q.cz);

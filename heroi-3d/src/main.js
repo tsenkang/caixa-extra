@@ -19,10 +19,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { PassoContorno, prepararProfundidade } from './posprocessamento.js';
 
 // ajuste de cor final: um pouco mais de saturação e contraste + vinheta nas bordas
 const CorFinal = {
-  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.15 }, uVinheta: { value: 0.35 } },
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.22 }, uVinheta: { value: 0.3 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uSat, uVinheta; varying vec2 vUv;
@@ -30,6 +32,9 @@ const CorFinal = {
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
       c.rgb = mix(vec3(l), c.rgb, uSat);
+      // sombras puxando para o azul, luzes para o quente (cara de filme de animação)
+      c.rgb += vec3(-0.015, 0.0, 0.035) * (1.0 - smoothstep(0.0, 0.5, l)) + vec3(0.03, 0.012, -0.02) * smoothstep(0.5, 1.0, l);
+      c.rgb = mix(c.rgb, c.rgb * c.rgb * (3.0 - 2.0 * c.rgb), 0.18); // contraste suave
       vec2 d = vUv - 0.5;
       c.rgb *= 1.0 - dot(d, d) * uVinheta * 2.0;
       gl_FragColor = c;
@@ -90,11 +95,21 @@ class Jogo {
 
     // brilho (bloom) no laser, explosões e faíscas
     this.composer = new EffectComposer(this.renderer);
+    prepararProfundidade(this.composer);
     this.composer.addPass(new RenderPass(this.cena, this.cam3));
+    this.contorno = new PassoContorno(this.cam3); // traço de tinta nas bordas
+    this.composer.addPass(this.contorno);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.7, 0.45, 4.0);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new ShaderPass(CorFinal));
     this.composer.addPass(new OutputPass());
+    this.fxaa = new ShaderPass(FXAAShader); // suaviza os serrilhados do traço
+    this.composer.addPass(this.fxaa);
+    this.ajustarFxaa = () => {
+      const pr = this.renderer.getPixelRatio();
+      this.fxaa.material.uniforms.resolution.value.set(1 / (innerWidth * pr), 1 / (innerHeight * pr));
+    };
+    this.ajustarFxaa();
     this.usarBloom = true;
 
     this.relogio = new THREE.Clock();
@@ -103,6 +118,7 @@ class Jogo {
     addEventListener('resize', () => {
       this.renderer.setSize(innerWidth, innerHeight);
       this.composer.setSize(innerWidth, innerHeight);
+      this.ajustarFxaa();
       this.cam3.aspect = innerWidth / innerHeight;
       this.cam3.updateProjectionMatrix();
     });
@@ -178,8 +194,8 @@ class Jogo {
     const h = this.heroi.pos;
     this.sol.target.position.set(Math.round(h.x), 0, Math.round(h.z));
     this.sol.position.copy(this.dirSol).multiplyScalar(300).add(this.sol.target.position);
-    if (this.usarBloom) this.composer.render();
-    else this.renderer.render(this.cena, this.cam3);
+    this.bloom.enabled = this.usarBloom;
+    this.composer.render();
     this.contarFps(dt);
   }
 

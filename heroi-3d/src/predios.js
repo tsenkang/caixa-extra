@@ -3,6 +3,7 @@
 // Todos os blocos da cidade são desenhados com 2 InstancedMesh (paredes com janela e blocos lisos).
 // Quando um bloco quebra, a instância some e nasce um pedaço com física (detritos.js).
 import * as THREE from 'three';
+import { materialMundo } from './modelos.js';
 import { texturaJanela, texturaConcreto, texturaJanelaAcesa, texturaVidro, texturaTijolo, texturaLoja } from './texturas.js';
 
 const HP_BLOCO = 30;
@@ -31,12 +32,12 @@ export class SistemaPredios {
     this.blocosQuebrados = 0;
     // tipos de bloco: 1 parede com janela, 2 liso, 3 janela com cortina/luz, 4 vidro espelhado
     this.materiais = [null,
-      new THREE.MeshLambertMaterial({ map: texturaJanela() }),
-      new THREE.MeshLambertMaterial({ map: texturaConcreto() }),
-      new THREE.MeshLambertMaterial({ map: texturaJanelaAcesa() }),
+      materialMundo({ map: texturaJanela() }),
+      materialMundo({ map: texturaConcreto() }),
+      materialMundo({ map: texturaJanelaAcesa() }),
       new THREE.MeshPhongMaterial({ map: texturaVidro(), shininess: 90, specular: 0x8899aa }),
-      new THREE.MeshLambertMaterial({ map: texturaTijolo() }),
-      new THREE.MeshLambertMaterial({ map: texturaLoja() }),
+      materialMundo({ map: texturaTijolo() }),
+      materialMundo({ map: texturaLoja() }),
     ];
     this.atualizarMalha = this.materiais.map(() => false);
     this._fila = new Int32Array(4096);

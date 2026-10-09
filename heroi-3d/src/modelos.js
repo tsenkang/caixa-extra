@@ -12,6 +12,20 @@ function criarGradiente() {
   return t;
 }
 export const gradienteToon = criarGradiente();
+// mundo (prédios, chão, árvores): 4 tons, mais suave que os personagens
+function criarGradienteMundo() {
+  const v = [105, 155, 210, 255];
+  const dados = new Uint8Array(v.flatMap((x) => [x, x, x, 255]));
+  const t = new THREE.DataTexture(dados, v.length, 1, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+}
+export const gradienteMundo = criarGradienteMundo();
+export function materialMundo(op = {}) {
+  const { flatShading, ...resto } = op; // toon não usa flatShading
+  return new THREE.MeshToonMaterial({ ...resto, gradientMap: gradienteMundo });
+}
 export const materialCores = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradienteToon });
 export const materialQueimado = new THREE.MeshToonMaterial({ vertexColors: true, color: 0x2a2a2a, gradientMap: gradienteToon });
 
