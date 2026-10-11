@@ -51,7 +51,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 #ajuda { position: absolute; bottom: 6px; right: 12px; font-size: 11px; opacity: 0.6; text-shadow: 0 1px 2px #000; }
 
 /* Menus */
-.tela-cheia { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+.tela-cheia { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
   background: radial-gradient(ellipse at center, rgba(20,30,70,0.75), rgba(0,0,0,0.9)); }
 .caixa { background: rgba(10,15,35,0.85); border: 2px solid #3b82f6; border-radius: 14px; padding: 32px 40px; text-align: center; max-width: 560px; }
 h1 { font-size: 46px; font-weight: 900; letter-spacing: 4px; background: linear-gradient(180deg, #fff, #ef4444); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -81,3 +81,73 @@ button.secundario { background: linear-gradient(180deg, #3b82f6, #1d4ed8); font-
 @keyframes tituloFase { 0% { opacity: 0; transform: scale(1.4); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(0.97); } }
 #op-fase { margin-left: 6px; padding: 3px 6px; border-radius: 6px; background: #0f172a; color: #fff; border: 1px solid #3b82f6; font: inherit; }
 @media (max-width: 600px) { #titulo-fase .grande { font-size: 44px; } }
+
+/* ---------- celular / toque ---------- */
+html, body { touch-action: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+.teclas.toque { display: none; }
+body.menu-toque .teclas.toque { display: table; }
+body.menu-toque .teclas.pc { display: none; }
+.caixa { max-height: 94vh; overflow-y: auto; touch-action: pan-y; }
+
+#toque { position: fixed; inset: 0; z-index: 5; pointer-events: none; user-select: none; -webkit-user-select: none; }
+#toque-esq, #toque-dir { position: absolute; top: 18%; bottom: 0; pointer-events: auto; touch-action: none; }
+#toque-esq { left: 0; width: 42%; }
+#toque-dir { right: 0; width: 58%; top: 0; }
+#joy-base { position: absolute; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.45); background: rgba(15,23,42,0.28); opacity: 0; transition: opacity 0.15s, border-color 0.15s; }
+#joy-base.visivel { opacity: 1; }
+#joy-base.turbo { border-color: #facc15; box-shadow: 0 0 18px rgba(250,204,21,0.6); }
+#joy-pino { position: absolute; left: 37px; top: 37px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.75); }
+.bt-toque { position: absolute; pointer-events: auto; touch-action: none; margin: 0; padding: 0; width: 62px; height: 62px; border-radius: 50%;
+  font-size: 20px; font-weight: 900; letter-spacing: 0; color: #fff; background: rgba(15,23,42,0.5); border: 2px solid rgba(255,255,255,0.55);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; -webkit-tap-highlight-color: transparent; }
+.bt-toque small { font-size: 8px; letter-spacing: 1px; margin-top: 2px; opacity: 0.85; }
+.bt-toque.grande { width: 82px; height: 82px; font-size: 13px; letter-spacing: 1px; }
+.bt-toque.apertado { background: rgba(255,255,255,0.4); transform: scale(0.93); }
+#bt-laser { right: 16px; bottom: 96px; background: rgba(185,28,28,0.6); border-color: #fca5a5; }
+#bt-laser.quente { animation: pisca 0.25s infinite alternate; }
+#bt-pegar { right: 108px; bottom: 16px; background: rgba(29,78,216,0.55); border-color: #93c5fd; }
+#bt-pegar.alvo { border-color: #4ade80; box-shadow: 0 0 12px #4ade80; }
+#bt-combo { right: 22px; bottom: 16px; }
+#bt-investida { right: 104px; bottom: 108px; }
+#bt-soco { right: 186px; bottom: 30px; }
+#bt-subir { right: 108px; bottom: 186px; width: 52px; height: 52px; }
+#bt-descer { right: 40px; bottom: 186px; width: 52px; height: 52px; }
+#bt-pausa { right: 12px; top: 10px; width: 44px; height: 44px; font-size: 15px; }
+#bt-grupo { position: absolute; right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); }
+
+/* HUD menor e reorganizado no modo toque (o joystick fica embaixo à esquerda) */
+body.modo-toque #ajuda { display: none; }
+body.modo-toque #painel-esq { left: 12px; top: 10px; bottom: auto; width: 190px; }
+body.modo-toque #painel-esq .rotulo { font-size: 10px; margin: 3px 0 2px; }
+body.modo-toque #painel-esq .barra { height: 10px; }
+body.modo-toque #fase-hud { top: 72px; left: 12px; }
+body.modo-toque #fase-hud b { font-size: 12px; }
+body.modo-toque #fase-hud span { font-size: 11px; }
+body.modo-toque #painel-dir { top: 60px; right: 12px; }
+body.modo-toque #estrelas { font-size: 20px; }
+body.modo-toque .contador { font-size: 11px; }
+body.modo-toque #chefes { width: 38vw; top: 10px; }
+body.modo-toque #combo { font-size: 26px; right: auto; left: 50%; top: 24%; transform: translateX(-50%); }
+body.modo-toque .msg { font-size: 18px; }
+body.modo-toque #fps { top: auto; bottom: 4px; left: 50%; transform: translateX(-50%); font-size: 10px; }
+
+/* telas pequenas: menu compacto */
+@media (max-height: 500px), (max-width: 600px) {
+  .caixa { padding: 14px 18px; max-width: 94vw; }
+  h1 { font-size: 30px; }
+  h2 { font-size: 24px; margin-bottom: 8px; }
+  .sub { margin: 2px 0 8px; font-size: 13px; }
+  .teclas { font-size: 11px; margin-bottom: 6px; }
+  .teclas td { padding: 1px 6px; }
+  button { font-size: 16px; padding: 9px 28px; margin-top: 8px; }
+  #titulo-fase .grande { font-size: 40px; }
+  #titulo-fase .topo, #titulo-fase .baixo { font-size: 13px; }
+}
+
+/* celular em pé */
+#girar { display: none; position: fixed; inset: 0; z-index: 50; background: #0b1020; color: #fff; font-size: 20px; font-weight: 800;
+  flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+#girar div { font-size: 64px; margin-bottom: 12px; animation: girarCel 1.6s ease-in-out infinite; }
+@keyframes girarCel { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+@media (orientation: portrait) { body.celular #girar { display: flex; } }

@@ -8,6 +8,14 @@ npm run dev
 ```
 Abra o endereço que aparecer (normalmente http://localhost:5173) no Chrome ou Edge e clique em **JOGAR**.
 
+## Celular
+
+No celular ou tablet os controles de toque ligam sozinhos (também dá para marcar "Controles de toque" no menu). Jogue com o celular deitado.
+- Dedo esquerdo: joystick que aparece onde você encosta. Empurrar além da borda liga a super velocidade.
+- Dedo direito: arraste para olhar. Os botões LASER e PEGAR também giram a câmera se você arrastar o dedo neles.
+- Botões: F (combo), Q (investida), E (soco), ▲ ▼ (subir/descer) e II (pausa).
+- No celular as sombras e o brilho começam desligados e a resolução é menor, para rodar mais leve.
+
 ## Controles
 Mouse olhar · WASD mover/voar · Espaço sobe · Ctrl ou C desce · Shift super velocidade ·
 Botão esquerdo laser · Botão direito segurar = pegar / soltar = arremessar · segurando alguém: F bate com ele na parede/chão e voar contra prédios arrasta ele pelas paredes · F combo de socos (avança até o inimigo; o 3º soco arremessa) · Q investida · E soco de impacto · P pausa · Esc solta o mouse

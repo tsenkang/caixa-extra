@@ -23,6 +23,7 @@ import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { PassoContorno, prepararProfundidade } from './posprocessamento.js';
 import { Fases, FASES, faseLiberada } from './fases.js';
 import { Godzilla } from './godzilla.js';
+import { ControlesToque, ehCelular } from './toque.js';
 
 // ajuste de cor final: um pouco mais de saturação e contraste + vinheta nas bordas
 const CorFinal = {
@@ -94,6 +95,7 @@ class Jogo {
     this.projeteis = new Projeteis(this);
     this.alerta = new Alerta(this);
     this.fases = new Fases(this);
+    this.toque = new ControlesToque(this.controles, this);
     this.controles.aoPerderTrava = () => { if (!this.acabou && !this.pausado) this.pausar(); };
 
     // brilho (bloom) no laser, explosões e faíscas
@@ -231,6 +233,7 @@ class Jogo {
     this.efeitos.atualizar(dt, this.cam3, this.renderer.domElement.clientHeight);
     this.alertaMax = Math.max(this.alertaMax || 0, this.alerta.nivel);
     this.hud.atualizar(dt);
+    this.toque.atualizar();
     this.audio?.atualizar(this.heroi.vel.length());
     ctrl.limpar();
   }
@@ -257,7 +260,7 @@ class Jogo {
     this.audio?.ctx.resume();
     this.pausado = false;
     this.relogio.getDelta();
-    this.controles.travar();
+    if (!this.modoToque) this.controles.travar();
   }
   fimDeJogo() {
     this.acabou = true;
@@ -291,6 +294,7 @@ class Jogo {
     // opções do menu
     const sombras = document.getElementById('op-sombras').checked;
     this.usarBloom = document.getElementById('op-bloom').checked;
+    this.modoToque = document.getElementById('op-toque').checked;
     this.renderer.shadowMap.enabled = sombras;
     this.sol.castShadow = sombras;
     this.cena.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
@@ -303,7 +307,12 @@ class Jogo {
     document.getElementById('menu').classList.add('escondido');
     document.getElementById('hud').classList.remove('escondido');
     this.pausado = false;
-    this.controles.travar();
+    if (this.modoToque) {
+      // celular: sem trava do mouse; tenta deixar a tela deitada
+      this.controles.semTrava = true;
+      this.toque.mostrar(true);
+      screen.orientation?.lock?.('landscape').catch(() => {});
+    } else this.controles.travar();
   }
 }
 
@@ -311,6 +320,21 @@ const jogo = new Jogo();
 window.jogo = jogo; // ajuda nos testes pelo console
 window.Inimigos = Inimigos;
 window.Godzilla = Godzilla;
+// celular: liga os controles de toque e deixa o jogo mais leve
+if (ehCelular()) {
+  document.body.classList.add('celular');
+  document.getElementById('op-toque').checked = true;
+  document.getElementById('op-sombras').checked = false;
+  document.getElementById('op-bloom').checked = false;
+  jogo.renderer.setPixelRatio(1);
+  jogo.composer.setPixelRatio?.(1);
+  jogo.composer.setSize(innerWidth, innerHeight);
+  jogo.ajustarFxaa();
+}
+const atualizarMenuToque = () => document.body.classList.toggle('menu-toque', document.getElementById('op-toque').checked);
+document.getElementById('op-toque').addEventListener('change', atualizarMenuToque);
+atualizarMenuToque();
+
 // lista de fases liberadas no menu
 const selFase = document.getElementById('op-fase');
 let inicio = 0;

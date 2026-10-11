@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Herói Supremo</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
@@ -42,7 +42,14 @@
     <div class="caixa">
       <h1>HERÓI SUPREMO</h1>
       <p class="sub">Voe, destrua, enfrente o exército e outros heróis.</p>
-      <table class="teclas">
+      <table class="teclas toque">
+        <tr><td>Dedo esquerdo</td><td>joystick: mover / voar (empurre até a borda = super velocidade)</td></tr>
+        <tr><td>Dedo direito</td><td>arraste para olhar</td></tr>
+        <tr><td>LASER / PEGAR</td><td>segure (dá para mirar arrastando o botão)</td></tr>
+        <tr><td>F · Q · E</td><td>combo · investida · soco</td></tr>
+        <tr><td>▲ ▼</td><td>subir / descer</td></tr>
+      </table>
+      <table class="teclas pc">
         <tr><td>Mouse</td><td>olhar</td></tr>
         <tr><td>W A S D</td><td>mover / voar</td></tr>
         <tr><td>Espaço / Ctrl (ou C)</td><td>subir / descer</td></tr>
@@ -55,6 +62,7 @@
         <tr><td>E</td><td>soco de impacto (chão ou parede)</td></tr>
       </table>
       <label class="opcao">Começar na fase: <select id="op-fase"></select></label>
+      <label class="opcao"><input type="checkbox" id="op-toque" /> Controles de toque (celular / tablet)</label>
       <label class="opcao"><input type="checkbox" id="op-telacheia" checked /> Tela cheia (permite usar Ctrl sem fechar a aba)</label>
       <label class="opcao"><input type="checkbox" id="op-sombras" checked /> Sombras</label>
       <label class="opcao"><input type="checkbox" id="op-bloom" checked /> Brilho nos efeitos (desmarque se ficar lento)</label>
@@ -62,6 +70,9 @@
       <p id="carregando">Carregando cidade...</p>
     </div>
   </div>
+
+  <!-- celular em pé: pede para girar -->
+  <div id="girar"><div>⟳</div>Gire o celular para jogar deitado</div>
 
   <!-- Pausa -->
   <div id="pausa" class="tela-cheia escondido">
